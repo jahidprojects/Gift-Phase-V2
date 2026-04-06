@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, memo, Component } from 'react';
 import WebApp from '@twa-dev/sdk';
+import { TonConnectButton, useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
 import { auth, db } from './firebase';
 import { 
   onAuthStateChanged, 
@@ -50,11 +51,12 @@ import {
   Globe,
   Twitter,
   Youtube,
-  Send
+  Send,
+  Heart
 } from 'lucide-react';
 
 /**
- * HEGMO ARENA FINAL - STABLE VERSION
+ * GIFT PHASE V2 - STABLE VERSION
  * Includes: Carrom-Style Physics, Correct Nav Alignment, 
  * Redesigned Task Center, Persistent Winner Popup, 
  * and White 3D Profile Buttons.
@@ -92,7 +94,7 @@ const TRANSLATIONS = {
     deposit: 'Deposit',
     withdrawal: 'Withdrawal',
     tonBalance: 'TON Balance',
-    inviteFriends: "Invite friends and earn 10% of they're spending TON",
+    inviteFriends: "Invite friends and earn 10% of their spending TON",
     copy: 'Copy',
     share: 'Share',
     recentActivity: 'Recent Activity',
@@ -204,18 +206,7 @@ const TRANSLATIONS = {
   }
 };
 
-const GUEST_DATA = [
-  { name: '@alex_pro', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop' },
-  { name: '@elena_win', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop' },
-  { name: '@dmitry_ton', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200&h=200&fit=crop' },
-  { name: '@sarah_crypto', avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&h=200&fit=crop' },
-  { name: '@marco_arena', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop' },
-  { name: '@lisa_hegmo', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop' },
-  { name: '@ivan_king', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop' },
-  { name: '@anna_star', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop' },
-  { name: '@pavel_bet', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop' },
-  { name: '@olga_luck', avatar: 'https://images.unsplash.com/photo-1554151228-14d9def656e4?w=200&h=200&fit=crop' },
-];
+const GUEST_DATA = [];
 
 const DAILY_TASKS = [
   { id: 'd1', title: 'Follow our Twitter', reward: '50,000', icon: <Twitter size={20} />, btn: 'Follow' },
@@ -242,21 +233,7 @@ const PARTNER_TASKS = [
   { id: 'p4', title: 'Complete Level 3', reward: '100,000', type: 'game', btn: 'Complete' },
 ];
 
-const LEADERBOARD_DATA = [
-  { id: 1, username: '@crypto_king', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop', volume: '4520.50', wins: 184, color: PLAYER_PALETTE[0] },
-  { id: 2, username: '@ton_master', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop', volume: '4105.20', wins: 162, color: PLAYER_PALETTE[1] },
-  { id: 3, username: '@arena_whale', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200&h=200&fit=crop', volume: '3850.15', wins: 145, color: PLAYER_PALETTE[2] },
-  { id: 4, username: '@hegmo_pro', avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&h=200&fit=crop', volume: '3200.00', wins: 128, color: PLAYER_PALETTE[3] },
-  { id: 5, username: '@lucky_star', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop', volume: '2950.40', wins: 112, color: PLAYER_PALETTE[4] },
-  ...Array.from({ length: 95 }, (_, i) => ({
-    id: i + 6,
-    username: `@user_${Math.floor(Math.random() * 9999)}`,
-    avatar: `https://images.unsplash.com/photo-${1500000000000 + i}?w=200&h=200&fit=crop`,
-    volume: (Math.random() * 2000 + 500).toFixed(2),
-    wins: Math.floor(Math.random() * 100 + 10),
-    color: PLAYER_PALETTE[(i + 5) % PLAYER_PALETTE.length]
-  }))
-];
+const LEADERBOARD_DATA = [];
 
 const ACTIVITIES = [
   { type: 'bid', val: '10.00 ∇', date: '2 mins ago', icon: <Bolt size={16} /> },
@@ -322,6 +299,70 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   // We don't throw here to avoid crashing the app since we removed ErrorBoundary
 }
+
+// --- SKELETON LOADER ---
+const Skeleton = ({ className, ...props }: { className?: string; [key: string]: any }) => (
+  <div className={`animate-pulse bg-white/5 rounded-2xl ${className}`} {...props}></div>
+);
+
+// --- LOADING SCREEN ---
+const LoadingScreen = ({ onPlay, onShare, progress, isStarted }: { onPlay: () => void, onShare: () => void, progress: number, isStarted: boolean }) => {
+  return (
+    <div className="fixed inset-0 z-[100] bg-[#60A5FA] flex flex-col items-center justify-center p-6 font-sans overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
+      
+      <div className="w-full max-w-xs bg-[#4F86C6]/80 backdrop-blur-md rounded-[40px] p-8 flex flex-col items-center shadow-2xl border border-white/20 relative z-10">
+        <div className="w-24 h-24 bg-gradient-to-br from-orange-400 to-yellow-300 rounded-3xl mb-6 flex items-center justify-center shadow-lg overflow-hidden border-2 border-white/30">
+           <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop" className="w-full h-full object-cover" alt="Gift Phase V2" referrerPolicy="no-referrer" />
+        </div>
+        <h1 className="text-3xl font-black text-white uppercase tracking-tight mb-8 text-center">Gift Phase V2</h1>
+        
+        <div className="flex gap-3 w-full">
+          <button 
+            onClick={onShare}
+            className="flex-1 bg-white/20 hover:bg-white/30 py-4 rounded-2xl flex items-center justify-center gap-2 text-white font-black uppercase text-sm transition-all border-t border-white/20 shadow-lg active:translate-y-[1px]"
+          >
+            <Send size={18} className="rotate-[-20deg]" />
+            Share
+          </button>
+          <button className="w-14 h-14 bg-white/20 hover:bg-white/30 rounded-2xl flex items-center justify-center text-white transition-all border-t border-white/20 shadow-lg active:translate-y-[1px]">
+            <Heart size={20} />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-12 w-full max-w-xs relative z-10">
+        {!isStarted ? (
+          <button 
+            onClick={onPlay}
+            className="w-full py-6 bg-gradient-to-b from-blue-400 to-blue-600 rounded-[32px] text-white font-black text-2xl uppercase tracking-widest shadow-[0_10px_0_#1E40AF] active:translate-y-[4px] active:shadow-[0_6px_0_#1E40AF] transition-all border-t border-white/30"
+          >
+            PLAY NOW
+          </button>
+        ) : (
+          <div className="w-full h-20 bg-blue-900/30 rounded-[32px] overflow-hidden p-2 border border-white/10 shadow-inner">
+            <div 
+              className="h-full bg-gradient-to-r from-blue-400 to-cyan-300 rounded-[24px] transition-all duration-100 flex items-center justify-center relative overflow-hidden"
+              style={{ width: `${progress}%` }}
+            >
+              <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.2)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.2)_50%,rgba(255,255,255,0.2)_75%,transparent_75%,transparent)] bg-[length:20px_20px] animate-[slide_1s_linear_infinite]"></div>
+              <span className="text-white font-black text-lg uppercase tracking-widest drop-shadow-md relative z-10">
+                LOADING {Math.round(progress)}%
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      <style>{`
+        @keyframes slide {
+          from { background-position: 0 0; }
+          to { background-position: 20px 0; }
+        }
+      `}</style>
+    </div>
+  );
+};
 
 // --- BACKGROUND SPARKS COMPONENT ---
 const SparkleBackground = memo(() => {
@@ -403,7 +444,7 @@ const App = () => {
   const [status, setStatus] = useState('waiting'); 
   const [winner, setWinner] = useState(null);
   const [persistentWinner, setPersistentWinner] = useState(null);
-  const [myBalance, setMyBalance] = useState(1000.0);
+  const [myBalance, setMyBalance] = useState(0);
   const [popupTimeLeft, setPopupTimeLeft] = useState(5);
   const [completedTaskIds, setCompletedTaskIds] = useState([]);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -413,13 +454,23 @@ const App = () => {
   const [promoIndex, setPromoIndex] = useState(0);
   const [taskCategory, setTaskCategory] = useState('daily');
   const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [leaderboard, setLeaderboard] = useState(LEADERBOARD_DATA);
+  const [leaderboard, setLeaderboard] = useState([]);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(true);
+  const [isGameLoaded, setIsGameLoaded] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isLoadingStarted, setIsLoadingStarted] = useState(false);
 
-  // Firebase Auth & Profile Sync
+  const [tonConnectUI] = useTonConnectUI();
+  const userAddress = useTonAddress();
+
+  // Firebase Auth & Profile Sync with Telegram Identity
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        const tgUser = WebApp.initDataUnsafe?.user;
+        const referrerId = WebApp.initDataUnsafe?.start_param;
+        
         setUser(firebaseUser);
         const userRef = doc(db, 'users', firebaseUser.uid);
         try {
@@ -428,21 +479,39 @@ const App = () => {
             const userData = userSnap.data();
             setMyBalance(userData.balance || 0);
             setCompletedTaskIds(userData.completedTasks || []);
-            // Other profile data can be synced here
+            
+            // Sync TG name if changed
+            if (tgUser && userData.username !== `@${tgUser.username || tgUser.first_name}`) {
+              updateDoc(userRef, {
+                username: `@${tgUser.username || tgUser.first_name}`,
+                avatar: tgUser.photo_url || userData.avatar
+              });
+            }
           } else {
-            // Create initial profile
+            // Create initial profile with 10 TON Bonus
             const initialData = {
               uid: firebaseUser.uid,
-              username: firebaseUser.displayName || `User_${firebaseUser.uid.slice(0, 5)}`,
-              avatar: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop',
-              balance: 1000.0,
+              tgId: tgUser?.id || null,
+              username: tgUser ? `@${tgUser.username || tgUser.first_name}` : `User_${firebaseUser.uid.slice(0, 5)}`,
+              avatar: tgUser?.photo_url || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop',
+              balance: 10.0,
               wins: 0,
               volume: 0,
               completedTasks: [],
+              referrer: referrerId || null,
               createdAt: serverTimestamp()
             };
             await setDoc(userRef, initialData);
-            setMyBalance(1000.0);
+            setMyBalance(10.0);
+            
+            // If referred, we could add logic here to reward the referrer
+            if (referrerId) {
+              const refDoc = doc(db, 'users', referrerId);
+              updateDoc(refDoc, {
+                balance: increment(1.0), // 1 TON bonus for referrer
+                referralCount: increment(1)
+              }).catch(() => {}); // Ignore if referrer doesn't exist
+            }
           }
         } catch (error) {
           handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
@@ -458,20 +527,27 @@ const App = () => {
   // Sync Leaderboard
   useEffect(() => {
     if (!isAuthReady) return;
+    setIsLoadingLeaderboard(true);
     const q = query(collection(db, 'users'), orderBy('volume', 'desc'), limit(100));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as any[];
-      if (data.length > 0) {
-        setLeaderboard(data.map((u, i) => ({
+      // Filter out any potential bot data if it exists in DB
+      const realUsers = data.filter(u => u.uid);
+      if (realUsers.length > 0) {
+        setLeaderboard(realUsers.map((u, i) => ({
           ...u,
           color: PLAYER_PALETTE[i % PLAYER_PALETTE.length]
         })));
+      } else {
+        setLeaderboard([]);
       }
+      setIsLoadingLeaderboard(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'users');
+      setIsLoadingLeaderboard(false);
     });
     return () => unsubscribe();
   }, [isAuthReady]);
@@ -514,11 +590,22 @@ const App = () => {
     if (typeof window !== 'undefined') {
       WebApp.ready();
       WebApp.expand();
-      // Set header color to match app theme
       WebApp.setHeaderColor('#0d0d0d');
       WebApp.setBackgroundColor('#0d0d0d');
+      
+      // Main Button for Arena
+      if (activeTab === 'arena' && status === 'waiting') {
+        WebApp.MainButton.setText('PLACE BID (1 TON)');
+        WebApp.MainButton.show();
+        WebApp.MainButton.onClick(() => addBid(1, true));
+      } else {
+        WebApp.MainButton.hide();
+      }
     }
-  }, []);
+    return () => {
+      WebApp.MainButton.offClick(() => addBid(1, true));
+    };
+  }, [activeTab, status]);
 
   useEffect(() => {
     localStorage.setItem('hegmo_balance', myBalance.toString());
@@ -649,10 +736,28 @@ const App = () => {
     return territories.find(t => t.startP < t.endP ? (p >= t.startP && p < t.endP) : (p >= t.startP || p < t.endP));
   };
 
+  // Winner Popup Timer
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (status === 'winner' && persistentWinner) {
+      setPopupTimeLeft(5);
+      timer = setInterval(() => {
+        setPopupTimeLeft((prev) => {
+          if (prev <= 0.1) {
+            clearInterval(timer);
+            resetGame();
+            return 0;
+          }
+          return prev - 0.1;
+        });
+      }, 100);
+    }
+    return () => clearInterval(timer);
+  }, [status, persistentWinner]);
+
   useEffect(() => {
     if (status === 'waiting' && timeLeft < 15 && timeLeft > 1) {
-      const b = GUEST_DATA[14 - timeLeft];
-      if (b && !players.find(p => p.username === b.name)) addBid(Math.floor(Math.random() * 40) + 10, false, b);
+      // Bot logic removed
     }
   }, [timeLeft, status]);
 
@@ -747,6 +852,7 @@ const App = () => {
   };
 
   const resetGame = async () => {
+    WebApp.HapticFeedback.impactOccurred('light');
     setWinner(null);
     setPersistentWinner(null);
     setIsAiming(false); 
@@ -772,10 +878,16 @@ const App = () => {
 
   const addBid = async (amt, isMe = false, bot = null) => {
     if (status !== 'waiting' || amt <= 0) return;
+    
+    if (isMe) {
+      WebApp.HapticFeedback.impactOccurred('medium');
+    }
+
     const finalAmt = isMe && amt > myBalance ? myBalance : amt;
     
-    const n = isMe ? (user?.displayName || 'Jahid') : bot.name;
-    const a = isMe ? (user?.photoURL || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop') : bot.avatar;
+    const tgUser = WebApp.initDataUnsafe?.user;
+    const n = isMe ? (tgUser ? `@${tgUser.username || tgUser.first_name}` : 'User') : bot.name;
+    const a = isMe ? (tgUser?.photo_url || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop') : bot.avatar;
     const pal = PLAYER_PALETTE[players.length % PLAYER_PALETTE.length];
     const newPlayer = { username: n, avatar: a, bet: finalAmt, color: pal.main, lightColor: pal.light, accentColor: pal.accent, isMe, id: Date.now() + Math.random() };
 
@@ -869,27 +981,45 @@ const App = () => {
   };
 
   const handleCopyReferral = () => {
-    navigator.clipboard.writeText("t.me/hegmo_bot?start=6686954447");
+    navigator.clipboard.writeText(`t.me/GiftPhaseBot?start=${user?.uid || '6686954447'}`);
     alert("Referral link copied to clipboard!");
   };
 
   const handleShare = () => {
-    if (navigator.share) {
+    const shareUrl = `t.me/GiftPhaseBot?start=${user?.uid || '6686954447'}`;
+    if (typeof window !== 'undefined' && WebApp.initData) {
+      WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent('Join me in Gift Phase V2 and win TON!')}`);
+    } else if (navigator.share) {
       navigator.share({
-        title: 'Hegmo Arena',
-        text: 'Join me in Hegmo Arena and win TON!',
-        url: 't.me/hegmo_bot?start=6686954447',
+        title: 'Gift Phase V2',
+        text: 'Join me in Gift Phase V2 and win TON!',
+        url: shareUrl,
       }).catch(console.error);
     } else {
       handleCopyReferral();
     }
   };
 
+  const startLoading = () => {
+    setIsLoadingStarted(true);
+    let currentProgress = 0;
+    const interval = setInterval(() => {
+      currentProgress += 2; 
+      if (currentProgress >= 100) {
+        setLoadingProgress(100);
+        clearInterval(interval);
+        setTimeout(() => setIsGameLoaded(true), 500);
+      } else {
+        setLoadingProgress(currentProgress);
+      }
+    }, 100); // 100ms * 50 steps = 5 seconds
+  };
+
   const premium3DStyle = `bg-gradient-to-b from-white/15 to-white/5 border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-[0_2px_0_rgba(0,0,0,0.4)] transition-all duration-75`;
   const white3DStyle = `bg-white border-t border-white/50 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-[0_2px_0_rgba(0,0,0,0.4)] transition-all duration-75 text-black font-black`;
 
   const renderArena = () => (
-    <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10">
+    <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10 pt-12">
       <div className="flex justify-between items-center p-4 pt-6 gap-3 shrink-0">
         <div className={`px-3 py-1.5 rounded-full flex-1 flex items-center justify-center gap-1.5 min-w-0 font-sans ${premium3DStyle}`}><span className="text-[14px]">🪙</span><span className="text-[11px] font-black uppercase">100,000 PUCK</span></div>
         <div className="bg-black/40 px-3 py-1 rounded-full border border-white/5 flex items-center gap-2 shrink-0 font-sans"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_#22c55e]"></div><span className="text-[11px] font-bold text-gray-300">117 online</span></div>
@@ -957,7 +1087,7 @@ const App = () => {
     else { tasksToShow = PARTNER_TASKS; themeGrad = 'from-[#E11D48] to-[#C026D3]'; }
 
     return (
-      <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10">
+      <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10 pt-12">
         <div className="absolute top-0 left-0 right-0 h-[450px] bg-gradient-to-b from-[#2563EB]/25 via-[#1E40AF]/5 to-transparent pointer-events-none"></div>
         <div className="w-full px-4 pt-10 shrink-0 relative z-20"><div ref={promoRef} className="w-full h-44 overflow-x-auto snap-x snap-mandatory no-scrollbar flex gap-4 scroll-smooth">{PROMO_BANNERS.map((promo) => (<div key={promo.id} className={`min-w-full h-full rounded-[36px] bg-gradient-to-br ${promo.grad} snap-center flex items-center p-8 border-t border-white/30 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden relative`}><div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,white_1px,transparent_1px)] bg-[length:15px_15px]"></div><div className="flex-1 flex flex-col gap-2 relative z-10"><h3 className="text-2xl font-black text-white uppercase italic">{promo.title}</h3><p className="text-white/70 font-bold text-xs uppercase">{promo.desc}</p><button className="mt-2 bg-white/20 px-4 py-1.5 rounded-full border border-white/20 text-[10px] font-black uppercase text-white">Learn More</button></div><div className="text-white/20 relative z-10">{promo.icon}</div></div>))}</div><div className="flex justify-center gap-1.5 mt-4">{PROMO_BANNERS.map((_, i) => (<div key={i} className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${promoIndex === i ? 'bg-cyan-400 w-4 shadow-[0_0_8px_#22d3ee]' : 'bg-white/10'}`} />))}</div></div>
         <div className="p-6 pt-6 pb-4 relative z-10 shrink-0 text-center"><h1 className="text-3xl font-black text-white uppercase mb-1">{t.taskCenter}</h1><p className="text-white/40 text-xs font-bold uppercase tracking-widest">{t.completeTasks}</p></div>
@@ -968,7 +1098,7 @@ const App = () => {
   };
 
   const renderRank = () => (
-    <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative z-10 px-4">
+    <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative z-10 px-4 pt-12">
       <div className="flex flex-col items-center p-6 pt-10 pb-4 relative z-10 text-center">
         <div className="mb-2 relative">
           <div className="absolute inset-0 bg-cyan-400/20 blur-2xl animate-pulse rounded-full"></div>
@@ -978,66 +1108,126 @@ const App = () => {
         <p className="text-white/40 text-sm font-bold uppercase tracking-wide">{t.top100}</p>
       </div>
       <div className="space-y-3 relative z-10">
-        {leaderboard.map((player, idx) => { 
-          const isRankedWithGradient = idx < 5; 
-          return (
-            <div 
-              key={player.id} 
-              className={`p-3.5 rounded-[24px] flex items-center justify-between border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[1px] transition-all`} 
-              style={{ background: isRankedWithGradient ? `linear-gradient(to right, ${player.color.accent}, ${player.color.main})` : '#111' }}
-            >
-              <div className="flex items-center gap-3">
-                <div className="relative shrink-0">
-                  <span className="absolute -top-1 -left-1 z-10 w-5 h-5 bg-black/80 rounded-full flex items-center justify-center text-[10px] font-black text-white border border-white/10">{idx + 1}</span>
-                  <img src={player.avatar} className="w-11 h-11 rounded-full border-[1.5px] border-white/20 shadow-md object-cover" referrerPolicy="no-referrer" />
-                  {idx < 3 && <Medal className="absolute -bottom-1 -right-1 z-10" size={16} fill="#FACC15" />}
+        {isLoadingLeaderboard ? (
+          Array.from({ length: 10 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))
+        ) : leaderboard.length > 0 ? (
+          leaderboard.map((player, idx) => { 
+            const isRankedWithGradient = idx < 5; 
+            return (
+              <div 
+                key={player.id} 
+                className={`p-3.5 rounded-[24px] flex items-center justify-between border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[1px] transition-all`} 
+                style={{ background: isRankedWithGradient ? `linear-gradient(to right, ${player.color.accent}, ${player.color.main})` : '#111' }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="relative shrink-0">
+                    <span className="absolute -top-1 -left-1 z-10 w-5 h-5 bg-black/80 rounded-full flex items-center justify-center text-[10px] font-black text-white border border-white/10">{idx + 1}</span>
+                    <img src={player.avatar} className="w-11 h-11 rounded-full border-[1.5px] border-white/20 shadow-md object-cover" referrerPolicy="no-referrer" />
+                    {idx < 3 && <Medal className="absolute -bottom-1 -right-1 z-10" size={16} fill="#FACC15" />}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[12px] font-black text-white uppercase tracking-tight">{player.username}</span>
+                    <span className="text-[8px] font-bold text-white/50 uppercase tracking-widest">{player.wins} {t.wins}</span>
+                  </div>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-[12px] font-black text-white uppercase tracking-tight">{player.username}</span>
-                  <span className="text-[8px] font-bold text-white/50 uppercase tracking-widest">{player.wins} {t.wins}</span>
+                <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[14px] font-black text-white tracking-tighter">{player.volume}</span>
+                    <span className="text-[10px] font-black text-white/60 uppercase">∇</span>
+                  </div>
+                  <span className="text-[8px] font-bold text-white/40 uppercase">TON</span>
                 </div>
               </div>
-              <div className="flex flex-col items-end">
-                <div className="flex items-center gap-1">
-                  <span className="text-[14px] font-black text-white tracking-tighter">{player.volume}</span>
-                  <span className="text-[10px] font-black text-white/60 uppercase">∇</span>
-                </div>
-                <span className="text-[8px] font-bold text-white/40 uppercase">TON</span>
-              </div>
-            </div>
-          ); 
-        })}
+            ); 
+          })
+        ) : (
+          <div className="py-20 text-center text-white/20 font-black uppercase tracking-widest">No Players Yet</div>
+        )}
       </div>
     </div>
   );
 
-  const renderProfile = () => (
-    <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative px-4 z-10">
-      <div className="flex items-center gap-6 py-10 shrink-0 relative z-10">
-        <div className="relative">
-          <div className="w-24 h-24 rounded-full overflow-hidden border-[3px] border-white/10 shadow-2xl">
-            <img src={user?.photoURL || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop"} className="w-full h-full object-cover bg-[#1a1a1a]" referrerPolicy="no-referrer" />
+  const renderProfile = () => {
+    const tgUser = WebApp.initDataUnsafe?.user;
+    const displayName = tgUser ? `${tgUser.first_name} ${tgUser.last_name || ''}`.trim() : (user?.displayName || 'Jahid');
+    const username = tgUser ? `@${tgUser.username || tgUser.first_name}` : (user?.uid.slice(-10) || '6686954447');
+    const avatar = tgUser?.photo_url || user?.photoURL || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop";
+
+    return (
+      <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative px-4 z-10 pt-12">
+        {!isAuthReady ? (
+          <div className="space-y-6 py-10">
+            <div className="flex items-center gap-6">
+              <Skeleton className="w-24 h-24 rounded-[28px]" />
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-32" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            </div>
+            <Skeleton className="h-44 w-full rounded-[44px]" />
           </div>
-          <button className="absolute -bottom-2 -right-2 bg-[#2563EB] p-2 rounded-xl border-t border-white/30 shadow-lg text-white">
-            <Settings size={14} fill="currentColor" />
-          </button>
-        </div>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-3">
-            <h2 className="text-3xl font-black text-white uppercase">{user?.displayName || 'Jahid'}</h2>
-            <button onClick={() => setLangIdx((langIdx + 1) % FLAGS.length)} className="text-2xl active:scale-90 transition-transform">{FLAGS[langIdx]}</button>
-          </div>
-          <span className="text-white/30 font-bold text-sm">#{user?.uid.slice(-10) || '6686954447'}</span>
-        </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-6 py-10 shrink-0 relative z-10">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-[28px] overflow-hidden border-[3px] border-white/10 shadow-2xl">
+                  <img src={avatar} className="w-full h-full object-cover bg-[#1a1a1a]" referrerPolicy="no-referrer" />
+                </div>
+                <button className="absolute -bottom-2 -right-2 bg-[#2563EB] p-2 rounded-xl border-t border-white/30 shadow-lg text-white">
+                  <Settings size={14} fill="currentColor" />
+                </button>
+              </div>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-3xl font-black text-white uppercase">{displayName}</h2>
+                  <button onClick={() => setLangIdx((langIdx + 1) % FLAGS.length)} className="text-2xl active:scale-90 transition-transform">{FLAGS[langIdx]}</button>
+                </div>
+                <span className="text-white/30 font-bold text-sm">{username}</span>
+              </div>
+            </div>
+            <div className="w-full bg-gradient-to-br from-[#2563EB] to-[#7C3AED] p-8 rounded-[44px] border-t border-white/10 shadow-[0_15px_35px_rgba(0,0,0,0.6)] mb-6 relative z-10 overflow-hidden min-h-[220px] flex items-center justify-center">
+              <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,#ffffff_1px,transparent_1px)] bg-[length:15px_15px]"></div>
+              <div className="flex flex-col items-center relative z-10 w-full py-2">
+                <div className="mb-6 scale-110">
+                  <TonConnectButton />
+                </div>
+                {userAddress && (
+                  <>
+                    <span className="text-white/50 text-[11px] font-black uppercase tracking-widest mb-1">{t.tonBalance}</span>
+                    <div className="flex items-center gap-2 mb-8">
+                      <span className="text-4xl font-black text-white leading-none">{myBalance.toFixed(2)}</span>
+                      <div className="w-8 h-8 rounded-full bg-cyan-400 flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.4)]">
+                        <Zap size={14} className="text-black fill-black" />
+                      </div>
+                    </div>
+                    <div className="flex gap-4 w-full px-4">
+                      <button onClick={handleDeposit} className={`flex-1 py-3.5 rounded-2xl ${white3DStyle}`}>{t.deposit}</button>
+                      <button onClick={handleWithdrawal} className={`flex-1 py-3.5 rounded-2xl bg-white/10 font-black text-sm uppercase ${premium3DStyle}`}>{t.withdrawal}</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+        <div className="w-full p-8 rounded-[44px] bg-gradient-to-br from-[#2563EB] to-[#7C3AED] border-t border-white/20 shadow-[0_10px_40px_rgba(37,99,235,0.3)] mb-6 overflow-hidden relative min-h-[340px] flex flex-col justify-between relative z-10"><div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,white_1px,transparent_1px)] bg-[length:20px_20px]"></div><div className="relative z-10 flex flex-col h-full"><h3 className="text-white font-black text-xl leading-tight uppercase mb-6 text-center">{t.inviteFriends}</h3><div className="bg-black/20 rounded-2xl p-5 mb-8 text-center border border-white/10"><span className="text-white font-bold text-[14px] break-all">t.me/GiftPhaseBot?start={user?.uid || '6686954447'}</span></div><div className="flex gap-4"><button onClick={handleCopyReferral} className={`flex-1 py-4 rounded-2xl bg-white text-black font-black text-sm uppercase shadow-lg active:translate-y-[2px] transition-all flex items-center justify-center gap-2`}><Copy size={16} /> {t.copy}</button><button onClick={handleShare} className={`flex-1 py-4 rounded-2xl bg-white/20 text-white font-black text-sm uppercase shadow-lg active:translate-y-[2px] transition-all flex items-center justify-center gap-2`}><Share2 size={16} /> {t.share}</button></div></div></div>
+        <div className="mb-10 relative z-10"><div className="flex items-center gap-2 mb-4 px-2"><History size={20} className="text-white/40" /><h4 className="text-white/40 font-black uppercase text-sm tracking-widest">{t.recentActivity}</h4></div><div className="space-y-3">{ACTIVITIES.map((act, i) => (<div key={i} className={`p-4 rounded-[28px] bg-[#111] border-t border-white/5 shadow-lg flex items-center justify-between`}><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-white/40">{act.icon}</div><div className="flex flex-col"><span className="text-white font-black text-sm uppercase">{act.val}</span><span className="text-white/20 font-bold text-[10px] uppercase">{act.type} • {act.date}</span></div></div><ChevronRight size={18} className="text-white/10" /></div>))}</div></div>
       </div>
-      <div className="w-full bg-gradient-to-br from-[#2563EB] to-[#7C3AED] p-8 rounded-[44px] border-t border-white/10 shadow-[0_15px_35px_rgba(0,0,0,0.6)] mb-6 relative z-10 overflow-hidden min-h-[220px] flex items-center justify-center"><div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,#ffffff_1px,transparent_1px)] bg-[length:15px_15px]"></div>{!isWalletConnected ? (<div className="flex justify-center relative z-10 w-full px-8"><button onClick={() => setIsWalletConnected(true)} className={`w-full py-4 rounded-[22px] flex flex-row items-center justify-center gap-3 whitespace-nowrap ${white3DStyle}`}><Wallet size={18} /> <span>{t.connectWallet}</span></button></div>) : (<div className="flex flex-col items-center relative z-10 w-full py-2"><span className="text-white/50 text-[11px] font-black uppercase tracking-widest mb-1">{t.tonBalance}</span><div className="flex items-center gap-2 mb-8"><span className="text-4xl font-black text-white leading-none">{myBalance.toFixed(2)}</span><div className="w-8 h-8 rounded-full bg-cyan-400 flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.4)]"><Zap size={14} className="text-black fill-black" /></div></div><div className="flex gap-4 w-full px-4"><button onClick={handleDeposit} className={`flex-1 py-3.5 rounded-2xl ${white3DStyle}`}>{t.deposit}</button><button onClick={handleWithdrawal} className={`flex-1 py-3.5 rounded-2xl bg-white/10 font-black text-sm uppercase ${premium3DStyle}`}>{t.withdrawal}</button></div></div>)}</div>
-      <div className="w-full p-8 rounded-[44px] bg-gradient-to-br from-[#2563EB] to-[#7C3AED] border-t border-white/20 shadow-[0_10px_40px_rgba(37,99,235,0.3)] mb-6 overflow-hidden relative min-h-[340px] flex flex-col justify-between relative z-10"><div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,white_1px,transparent_1px)] bg-[length:20px_20px]"></div><div className="relative z-10 flex flex-col h-full"><h3 className="text-white font-black text-xl leading-tight uppercase mb-6 text-center">{t.inviteFriends}</h3><div className="bg-black/20 rounded-2xl p-5 mb-8 text-center border border-white/10"><span className="text-white font-bold text-[14px] break-all">t.me/hegmo_bot?start=6686954447</span></div><div className="flex gap-4"><button onClick={handleCopyReferral} className={`flex-1 py-4 rounded-2xl bg-white text-black font-black text-sm uppercase shadow-lg active:translate-y-[2px] transition-all flex items-center justify-center gap-2`}><Copy size={16} /> {t.copy}</button><button onClick={handleShare} className={`flex-1 py-4 rounded-2xl bg-white/20 text-white font-black text-sm uppercase shadow-lg active:translate-y-[2px] transition-all flex items-center justify-center gap-2`}><Share2 size={16} /> {t.share}</button></div></div></div>
-      <div className="mb-10 relative z-10"><div className="flex items-center gap-2 mb-4 px-2"><History size={20} className="text-white/40" /><h4 className="text-white/40 font-black uppercase text-sm tracking-widest">{t.recentActivity}</h4></div><div className="space-y-3">{ACTIVITIES.map((act, i) => (<div key={i} className={`p-4 rounded-[28px] bg-[#111] border-t border-white/5 shadow-lg flex items-center justify-between`}><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-white/40">{act.icon}</div><div className="flex flex-col"><span className="text-white font-black text-sm uppercase">{act.val}</span><span className="text-white/20 font-bold text-[10px] uppercase">{act.type} • {act.date}</span></div></div><ChevronRight size={18} className="text-white/10" /></div>))}</div></div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="flex flex-col h-screen bg-[#0d0d0d] text-white font-['Outfit',_sans-serif] max-w-md mx-auto relative overflow-hidden">
+      {!isGameLoaded && (
+        <LoadingScreen 
+          onPlay={startLoading} 
+          onShare={handleShare} 
+          progress={loadingProgress} 
+          isStarted={isLoadingStarted} 
+        />
+      )}
       <style>{`
         body { font-family: 'Outfit', sans-serif; overflow: hidden; height: 100vh; width: 100%; position: fixed; background: #0d0d0d; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -1066,8 +1256,8 @@ const App = () => {
         <div onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'tasks' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}><ClipboardList size={26} /><span className="text-[11px] font-bold uppercase font-sans">{t.tasks}</span></div>
         <div onClick={() => setActiveTab('rank')} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'rank' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}><Trophy size={26} /><span className="text-[11px] font-bold uppercase font-sans">{t.rank}</span></div>
         <div onClick={() => setActiveTab('profile')} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'profile' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}>
-          <div className={`w-[32px] h-[32px] rounded-full overflow-hidden border-[2px] transition-all shadow-sm ${activeTab === 'profile' ? 'border-[#2563EB] grayscale-0' : 'border-white/10 grayscale opacity-50'}`}>
-            <img src={user?.photoURL || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop"} alt="Me" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          <div className={`w-[34px] h-[34px] rounded-full overflow-hidden border-[2px] transition-all shadow-sm aspect-square flex items-center justify-center ${activeTab === 'profile' ? 'border-[#2563EB] grayscale-0' : 'border-white/10 grayscale opacity-50'}`}>
+            <img src={user?.photoURL || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop"} alt="Me" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
           </div>
           <span className="text-[11px] font-bold uppercase font-sans">{t.profile}</span>
         </div>
