@@ -72,6 +72,80 @@
         "lastWinner": { "type": "object", "description": "The most recent winner." },
         "topWinner": { "type": "object", "description": "The winner with the largest pot." }
       }
+    },
+    "Task": {
+      "title": "Game Task",
+      "description": "A task for users to complete for rewards.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "reward": { "type": "number" },
+        "type": { "type": "string", "enum": ["daily", "partner", "achievement", "social"] },
+        "btn": { "type": "string" },
+        "link": { "type": "string" },
+        "completedCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "reward", "type"]
+    },
+    "PromoCode": {
+      "title": "Promo Code",
+      "description": "A code users can redeem for TON or PUCK.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "reward": { "type": "number" },
+        "supply": { "type": "integer" },
+        "claimedBy": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "reward", "supply"]
+    },
+    "ReferralLink": {
+      "title": "Referral Link",
+      "description": "A custom referral link for partners.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "joins": { "type": "integer" },
+        "ads": { "type": "integer" },
+        "revenue": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name"]
+    },
+    "WithdrawalOffer": {
+      "title": "Withdrawal Offer",
+      "description": "Dynamic withdrawal limits and offers.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "minAmount": { "type": "number" },
+        "maxAmount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "minAmount", "maxAmount"]
+    },
+    "Analytics": {
+      "title": "App Analytics",
+      "description": "Global application usage statistics.",
+      "type": "object",
+      "properties": {
+        "totalUsers": { "type": "integer" },
+        "joinedToday": { "type": "integer" },
+        "activeToday": { "type": "integer" },
+        "rewardAds": { "type": "integer" },
+        "interstitials": { "type": "integer" },
+        "totalSpins": { "type": "integer" },
+        "pendingWithdrawals": { "type": "integer" },
+        "totalRevenue": { "type": "number" },
+        "promosClaimed": { "type": "integer" },
+        "tasksDone": { "type": "integer" },
+        "totalBalance": { "type": "number" }
+      }
     }
   },
   "firestore": {
@@ -94,6 +168,26 @@
     "/stats/{statId}": {
       "schema": "WinnerStats",
       "description": "Global game statistics."
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Manageable tasks."
+    },
+    "/promoCodes/{codeId}": {
+      "schema": "PromoCode",
+      "description": "Redeemable promo codes."
+    },
+    "/referralLinks/{linkId}": {
+      "schema": "ReferralLink",
+      "description": "Partner referral links."
+    },
+    "/withdrawalOffers/{offerId}": {
+      "schema": "WithdrawalOffer",
+      "description": "Withdrawal offers and limits."
+    },
+    "/analytics/{analyticsId}": {
+      "schema": "Analytics",
+      "description": "App-wide analytics."
     }
   }
 }

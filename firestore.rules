@@ -56,6 +56,57 @@ service cloud.firestore {
     // Fields:
     //   - lastWinner: map (required)
     //   - topWinner: map (required)
+    //
+    // Collection: tasks
+    // Document ID: {taskId}
+    // Fields:
+    //   - id: string (required)
+    //   - title: string (required)
+    //   - reward: number (required)
+    //   - type: string (required, ['daily', 'partner', 'achievement', 'social'])
+    //   - btn: string (optional)
+    //   - link: string (optional)
+    //   - completedCount: number (optional)
+    //
+    // Collection: promoCodes
+    // Document ID: {codeId}
+    // Fields:
+    //   - code: string (required)
+    //   - reward: number (required)
+    //   - supply: number (required)
+    //   - claimedBy: list (optional)
+    //
+    // Collection: referralLinks
+    // Document ID: {linkId}
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - joins: number (optional)
+    //   - ads: number (optional)
+    //   - revenue: number (optional)
+    //
+    // Collection: withdrawalOffers
+    // Document ID: {offerId}
+    // Fields:
+    //   - id: string (required)
+    //   - title: string (required)
+    //   - minAmount: number (required)
+    //   - maxAmount: number (required)
+    //
+    // Collection: analytics
+    // Document ID: global
+    // Fields:
+    //   - totalUsers: number
+    //   - joinedToday: number
+    //   - activeToday: number
+    //   - rewardAds: number
+    //   - interstitials: number
+    //   - totalSpins: number
+    //   - pendingWithdrawals: number
+    //   - totalRevenue: number
+    //   - promosClaimed: number
+    //   - tasksDone: number
+    //   - totalBalance: number
     // ===============================================================
 
     // ===============================================================
@@ -131,6 +182,39 @@ service cloud.firestore {
              data.topWinner is map;
     }
 
+    function isValidTask(data) {
+      return data.keys().hasAll(['id', 'title', 'reward', 'type']) &&
+             data.id is string &&
+             data.title is string && data.title.size() < 100 &&
+             data.reward is number &&
+             data.type in ['daily', 'partner', 'achievement', 'social'];
+    }
+
+    function isValidPromoCode(data) {
+      return data.keys().hasAll(['code', 'reward', 'supply']) &&
+             data.code is string && data.code.size() < 50 &&
+             data.reward is number &&
+             data.supply is int;
+    }
+
+    function isValidReferralLink(data) {
+      return data.keys().hasAll(['id', 'name']) &&
+             data.id is string &&
+             data.name is string && data.name.size() < 100;
+    }
+
+    function isValidWithdrawalOffer(data) {
+      return data.keys().hasAll(['id', 'title', 'minAmount', 'maxAmount']) &&
+             data.id is string &&
+             data.title is string &&
+             data.minAmount is number &&
+             data.maxAmount is number;
+    }
+
+    function isValidAnalytics(data) {
+      return true; // Analytics are usually updated by server or admin
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -138,6 +222,31 @@ service cloud.firestore {
     match /stats/{statId} {
       allow read: if true;
       allow write: if isAuthenticated() && isValidStats(request.resource.data);
+    }
+
+    match /tasks/{taskId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidTask(request.resource.data);
+    }
+
+    match /promoCodes/{codeId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && isValidPromoCode(request.resource.data);
+    }
+
+    match /referralLinks/{linkId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidReferralLink(request.resource.data);
+    }
+
+    match /withdrawalOffers/{offerId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidWithdrawalOffer(request.resource.data);
+    }
+
+    match /analytics/{analyticsId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin() && isValidAnalytics(request.resource.data);
     }
 
     match /users/{userId} {
@@ -153,7 +262,7 @@ service cloud.firestore {
 
     match /games/{gameId} {
       allow read: if true; // Publicly readable for live game
-      allow create, update: if isAdmin(); // Only admins can manage game state
+      allow create, update: if isAuthenticated() && isValidGame(request.resource.data);
     }
 
     match /transactions/{transactionId} {

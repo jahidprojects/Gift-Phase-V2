@@ -58,6 +58,7 @@ import {
   Copy,
   Share2,
   History,
+  Link,
   ArrowDownCircle,
   ArrowUpCircle,
   Plus,
@@ -66,7 +67,14 @@ import {
   Youtube,
   Send,
   Heart,
-  Users
+  Users,
+  Search,
+  CheckSquare,
+  BarChart2,
+  Coins,
+  MessageSquare,
+  Trash2,
+  ExternalLink
 } from 'lucide-react';
 
 /**
@@ -1098,19 +1106,23 @@ const App = () => {
   const AdminPanel = () => {
     const [allUsers, setAllUsers] = useState([]);
     const [allTransactions, setAllTransactions] = useState([]);
-    const [stats, setStats] = useState({ totalBalance: 0, totalUsers: 0, totalVolume: 0 });
+    const [allTasks, setAllTasks] = useState([]);
+    const [allPromoCodes, setAllPromoCodes] = useState([]);
+    const [allReferralLinks, setAllReferralLinks] = useState([]);
+    const [allWithdrawalOffers, setAllWithdrawalOffers] = useState([]);
+    const [analytics, setAnalytics] = useState(null);
+    const [adminTab, setAdminTab] = useState('users');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isAddingTask, setIsAddingTask] = useState(false);
+    const [isAddingPromo, setIsAddingPromo] = useState(false);
+    const [isAddingReferral, setIsAddingReferral] = useState(false);
+    const [isAddingWithdrawal, setIsAddingWithdrawal] = useState(false);
 
     useEffect(() => {
       if (!isAdmin || !user) return;
       
       const usersUnsub = onSnapshot(collection(db, 'users'), (snap) => {
-        const users = snap.docs.map(d => d.data());
-        setAllUsers(users);
-        setStats({
-          totalUsers: users.length,
-          totalBalance: users.reduce((acc, u) => acc + (u.balance || 0), 0),
-          totalVolume: users.reduce((acc, u) => acc + (u.volume || 0), 0)
-        });
+        setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, 'users');
       });
@@ -1121,70 +1133,341 @@ const App = () => {
         handleFirestoreError(error, OperationType.LIST, 'transactions');
       });
 
-      return () => { usersUnsub(); transUnsub(); };
+      const tasksUnsub = onSnapshot(collection(db, 'tasks'), (snap) => {
+        setAllTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+
+      const promoUnsub = onSnapshot(collection(db, 'promoCodes'), (snap) => {
+        setAllPromoCodes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+
+      const referralUnsub = onSnapshot(collection(db, 'referralLinks'), (snap) => {
+        setAllReferralLinks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+
+      const withdrawalUnsub = onSnapshot(collection(db, 'withdrawalOffers'), (snap) => {
+        setAllWithdrawalOffers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+
+      const analyticsUnsub = onSnapshot(doc(db, 'analytics', 'global'), (snap) => {
+        if (snap.exists()) setAnalytics(snap.data());
+      });
+
+      return () => { 
+        usersUnsub(); 
+        transUnsub(); 
+        tasksUnsub(); 
+        promoUnsub(); 
+        referralUnsub(); 
+        withdrawalUnsub(); 
+        analyticsUnsub();
+      };
     }, [isAdmin, user]);
 
+    const filteredUsers = allUsers.filter(u => 
+      u.username?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      u.uid?.includes(searchQuery)
+    );
+
     return (
-      <div className="fixed inset-0 z-[500] bg-black/95 backdrop-blur-xl flex flex-col p-6 overflow-y-auto no-scrollbar">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-2xl font-black uppercase italic text-cyan-400">Admin Command Center</h2>
-          <button onClick={() => setIsAdminPanelOpen(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center"><X size={20} /></button>
-        </div>
-        
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col items-center">
-            <span className="text-[10px] font-bold text-white/40 uppercase">Users</span>
-            <span className="text-xl font-black text-white">{stats.totalUsers}</span>
+      <div className="fixed inset-0 z-[500] bg-black/95 backdrop-blur-xl flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-400/20 flex items-center justify-center">
+              <Settings className="text-cyan-400" size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-black uppercase italic text-white">Admin Panel</h2>
+              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">System Control Center</p>
+            </div>
           </div>
-          <div className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col items-center">
-            <span className="text-[10px] font-bold text-white/40 uppercase">Total TON</span>
-            <span className="text-xl font-black text-white">{stats.totalBalance.toFixed(1)}</span>
-          </div>
-          <div className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col items-center">
-            <span className="text-[10px] font-bold text-white/40 uppercase">Volume</span>
-            <span className="text-xl font-black text-white">{stats.totalVolume.toFixed(0)}</span>
-          </div>
+          <button onClick={() => setIsAdminPanelOpen(false)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+            <X size={20} />
+          </button>
         </div>
 
-        <div className="space-y-6">
-          <section>
-            <h3 className="text-sm font-black uppercase text-white/60 mb-4 flex items-center gap-2"><Users size={16} /> User Directory</h3>
-            <div className="space-y-2">
-              {allUsers.map((u, i) => (
-                <div key={i} className="p-3 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img src={u.avatar} className="w-8 h-8 rounded-full" />
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold text-white">{u.username}</span>
-                      <span className="text-[9px] text-white/30">{u.uid.slice(0, 12)}...</span>
+        {/* Navigation Tabs */}
+        <div className="flex overflow-x-auto no-scrollbar border-b border-white/10 shrink-0 bg-white/5">
+          {[
+            { id: 'users', icon: <Users size={18} />, label: 'Users' },
+            { id: 'tasks', icon: <CheckSquare size={18} />, label: 'Tasks' },
+            { id: 'promo', icon: <Gift size={18} />, label: 'Promo' },
+            { id: 'referral', icon: <Link size={18} />, label: 'Referral' },
+            { id: 'analytics', icon: <BarChart2 size={18} />, label: 'Stats' },
+            { id: 'withdrawal', icon: <Coins size={18} />, label: 'Offers' },
+            { id: 'messages', icon: <MessageSquare size={18} />, label: 'Chat' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setAdminTab(tab.id)}
+              className={`flex items-center gap-2 px-6 py-4 border-b-2 transition-all shrink-0 ${
+                adminTab === tab.id 
+                ? 'border-cyan-400 text-cyan-400 bg-cyan-400/5' 
+                : 'border-transparent text-white/40 hover:text-white/60'
+              }`}
+            >
+              {tab.icon}
+              <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto no-scrollbar p-6">
+          {adminTab === 'users' && (
+            <div className="space-y-6">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Search by username or UID..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:outline-none focus:border-cyan-400/50 transition-all"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                {filteredUsers.map((u, i) => (
+                  <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/5 flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <img src={u.avatar} className="w-10 h-10 rounded-full border border-white/10" referrerPolicy="no-referrer" />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black text-white">{u.username}</span>
+                          <span className="text-[10px] text-white/30 font-mono">{u.uid}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs font-black text-cyan-400">{u.balance?.toFixed(2)} TON</div>
+                        <div className="text-[10px] text-white/40 uppercase font-black">{u.role}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2 pt-4 border-t border-white/5">
+                      <div className="flex flex-col items-center p-2 bg-black/20 rounded-xl">
+                        <span className="text-[8px] font-black text-white/30 uppercase">Puck</span>
+                        <span className="text-xs font-black text-white">{u.puckBalance || 0}</span>
+                      </div>
+                      <div className="flex flex-col items-center p-2 bg-black/20 rounded-xl">
+                        <span className="text-[8px] font-black text-white/30 uppercase">Played</span>
+                        <span className="text-xs font-black text-white">{u.matchesPlayed || 0}</span>
+                      </div>
+                      <div className="flex flex-col items-center p-2 bg-black/20 rounded-xl">
+                        <span className="text-[8px] font-black text-white/30 uppercase">Wins</span>
+                        <span className="text-xs font-black text-green-400">{u.wins || 0}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs font-black text-cyan-400">{u.balance?.toFixed(2)} TON</div>
-                    <div className="text-[9px] text-white/40 uppercase font-bold">{u.role}</div>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </section>
+          )}
 
-          <section>
-            <h3 className="text-sm font-black uppercase text-white/60 mb-4 flex items-center gap-2"><History size={16} /> Recent Transactions</h3>
-            <div className="space-y-2">
-              {allTransactions.map((t, i) => (
-                <div key={i} className="p-3 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className={`text-[10px] font-black uppercase ${t.type === 'deposit' ? 'text-green-400' : 'text-red-400'}`}>{t.type}</span>
-                    <span className="text-[9px] text-white/30">{t.uid.slice(0, 8)}...</span>
+          {adminTab === 'tasks' && (
+            <div className="space-y-6">
+              <button 
+                onClick={() => {
+                  const title = prompt("Task Title:");
+                  const reward = parseInt(prompt("Reward (PUCK):") || "0");
+                  const type = prompt("Type (daily/partner/achievement/social):");
+                  if (title && reward && type) {
+                    const id = `task_${Date.now()}`;
+                    setDoc(doc(db, 'tasks', id), { id, title, reward, type, createdAt: serverTimestamp() });
+                  }
+                }}
+                className="w-full py-4 bg-cyan-400 text-black font-black uppercase rounded-2xl flex items-center justify-center gap-2 shadow-[0_5px_0_#0891b2] active:translate-y-1 active:shadow-none transition-all"
+              >
+                <Plus size={20} /> Add New Task
+              </button>
+
+              <div className="space-y-3">
+                {allTasks.map(task => (
+                  <div key={task.id} className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                        <CheckSquare size={20} className="text-cyan-400" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-white">{task.title}</span>
+                        <span className="text-[10px] text-white/30 uppercase font-black">{task.type} • {task.reward} PUCK</span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => { if(confirm("Delete task?")) updateDoc(doc(db, 'tasks', task.id), { deleted: true }) }}
+                      className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs font-black text-white">{t.amount} TON</div>
-                    <div className={`text-[9px] font-bold uppercase ${t.status === 'completed' ? 'text-green-500' : 'text-yellow-500'}`}>{t.status}</div>
-                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {adminTab === 'analytics' && (
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: 'Total Users', value: allUsers.length, color: 'text-white' },
+                { label: 'Total TON', value: allUsers.reduce((acc, u) => acc + (u.balance || 0), 0).toFixed(1), color: 'text-cyan-400' },
+                { label: 'Total Volume', value: allUsers.reduce((acc, u) => acc + (u.volume || 0), 0).toFixed(0), color: 'text-white' },
+                { label: 'Active Today', value: analytics?.activeToday || 0, color: 'text-green-400' },
+                { label: 'Joined Today', value: analytics?.joinedToday || 0, color: 'text-blue-400' },
+                { label: 'Total Spins', value: analytics?.totalSpins || 0, color: 'text-purple-400' },
+              ].map((stat, i) => (
+                <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/10 flex flex-col gap-1">
+                  <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">{stat.label}</span>
+                  <span className={`text-xl font-black ${stat.color}`}>{stat.value}</span>
                 </div>
               ))}
             </div>
-          </section>
+          )}
+
+          {adminTab === 'promo' && (
+            <div className="space-y-6">
+              <button 
+                onClick={() => {
+                  const code = prompt("Promo Code:");
+                  const reward = parseFloat(prompt("Reward (TON):") || "0");
+                  const supply = parseInt(prompt("Supply:") || "0");
+                  if (code && reward && supply) {
+                    setDoc(doc(db, 'promoCodes', code), { code, reward, supply, claimedBy: [], createdAt: serverTimestamp() });
+                  }
+                }}
+                className="w-full py-4 bg-purple-500 text-white font-black uppercase rounded-2xl flex items-center justify-center gap-2 shadow-[0_5px_0_#7c3aed] active:translate-y-1 active:shadow-none transition-all"
+              >
+                <Plus size={20} /> Create Promo Code
+              </button>
+
+              <div className="space-y-3">
+                {allPromoCodes.map(promo => (
+                  <div key={promo.id} className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                        <Gift size={20} className="text-purple-400" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-white">{promo.code}</span>
+                        <span className="text-[10px] text-white/30 uppercase font-black">{promo.reward} TON • {promo.claimedBy?.length || 0}/{promo.supply} Claimed</span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => { if(confirm("Delete promo?")) updateDoc(doc(db, 'promoCodes', promo.id), { deleted: true }) }}
+                      className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {adminTab === 'referral' && (
+            <div className="space-y-6">
+              <button 
+                onClick={() => {
+                  const name = prompt("Partner Name:");
+                  if (name) {
+                    const id = `ref_${Date.now()}`;
+                    setDoc(doc(db, 'referralLinks', id), { id, name, joins: 0, ads: 0, revenue: 0, createdAt: serverTimestamp() });
+                  }
+                }}
+                className="w-full py-4 bg-blue-500 text-white font-black uppercase rounded-2xl flex items-center justify-center gap-2 shadow-[0_5px_0_#2563eb] active:translate-y-1 active:shadow-none transition-all"
+              >
+                <Plus size={20} /> Create Referral Link
+              </button>
+
+              <div className="space-y-3">
+                {allReferralLinks.map(link => (
+                  <div key={link.id} className="p-4 bg-white/5 rounded-2xl border border-white/5 flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                          <ExternalLink size={20} className="text-blue-400" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black text-white">{link.name}</span>
+                          <span className="text-[10px] text-white/30 font-mono">t.me/GiftPhaseBot?start={link.id}</span>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => { if(confirm("Delete link?")) updateDoc(doc(db, 'referralLinks', link.id), { deleted: true }) }}
+                        className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-black/20 p-2 rounded-xl text-center">
+                        <div className="text-[8px] font-black text-white/30 uppercase">Joins</div>
+                        <div className="text-xs font-black text-white">{link.joins || 0}</div>
+                      </div>
+                      <div className="bg-black/20 p-2 rounded-xl text-center">
+                        <div className="text-[8px] font-black text-white/30 uppercase">Ads</div>
+                        <div className="text-xs font-black text-white">{link.ads || 0}</div>
+                      </div>
+                      <div className="bg-black/20 p-2 rounded-xl text-center">
+                        <div className="text-[8px] font-black text-white/30 uppercase">Rev</div>
+                        <div className="text-xs font-black text-green-400">${(link.revenue || 0).toFixed(2)}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {adminTab === 'withdrawal' && (
+            <div className="space-y-6">
+              <button 
+                onClick={() => {
+                  const title = prompt("Offer Title:");
+                  const min = parseFloat(prompt("Min Amount (TON):") || "0");
+                  const max = parseFloat(prompt("Max Amount (TON):") || "0");
+                  if (title && min && max) {
+                    const id = `off_${Date.now()}`;
+                    setDoc(doc(db, 'withdrawalOffers', id), { id, title, minAmount: min, maxAmount: max, createdAt: serverTimestamp() });
+                  }
+                }}
+                className="w-full py-4 bg-green-500 text-white font-black uppercase rounded-2xl flex items-center justify-center gap-2 shadow-[0_5px_0_#16a34a] active:translate-y-1 active:shadow-none transition-all"
+              >
+                <Plus size={20} /> Create Withdrawal Offer
+              </button>
+
+              <div className="space-y-3">
+                {allWithdrawalOffers.map(offer => (
+                  <div key={offer.id} className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                        <Coins size={20} className="text-green-400" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-white">{offer.title}</span>
+                        <span className="text-[10px] text-white/30 uppercase font-black">{offer.minAmount}-{offer.maxAmount} TON</span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => { if(confirm("Delete offer?")) updateDoc(doc(db, 'withdrawalOffers', offer.id), { deleted: true }) }}
+                      className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {adminTab === 'messages' && (
+            <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
+              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                <MessageSquare size={32} />
+              </div>
+              <p className="text-xs font-black uppercase tracking-widest">Admin Chat Coming Soon</p>
+            </div>
+          )}
         </div>
       </div>
     );
