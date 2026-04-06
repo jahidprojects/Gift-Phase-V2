@@ -9,13 +9,46 @@
         "username": { "type": "string", "description": "User's display name or Telegram handle." },
         "avatar": { "type": "string", "description": "URL to the user's profile image." },
         "balance": { "type": "number", "description": "User's current TON balance." },
+        "puckBalance": { "type": "number", "description": "User's current PUCK balance." },
         "wins": { "type": "integer", "description": "Total number of games won." },
         "volume": { "type": "number", "description": "Total TON volume wagered." },
         "completedTasks": { "type": "array", "items": { "type": "string" }, "description": "List of IDs for completed tasks." },
         "referralCode": { "type": "string", "description": "Unique referral code for the user." },
-        "referredBy": { "type": "string", "description": "UID of the user who referred this user." }
+        "referredBy": { "type": "string", "description": "UID of the user who referred this user." },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "User's role for access control." },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["uid", "username", "balance"]
+      "required": ["uid", "username", "balance", "role"]
+    },
+    "Transaction": {
+      "title": "Financial Transaction",
+      "description": "Stores TON deposit and withdrawal records.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["deposit", "withdrawal"] },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "uid", "amount", "type", "status", "createdAt"]
+    },
+    "Winner": {
+      "title": "Game Winner",
+      "description": "Stores records of game winners for the leaderboard.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "gameId": { "type": "string" },
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "avatar": { "type": "string" },
+        "amount": { "type": "number" },
+        "winChance": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "gameId", "uid", "username", "amount", "createdAt"]
     },
     "Game": {
       "title": "Game Session",
@@ -40,6 +73,14 @@
     "/games/{gameId}": {
       "schema": "Game",
       "description": "Game session documents."
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "TON deposit and withdrawal records."
+    },
+    "/winners/{winnerId}": {
+      "schema": "Winner",
+      "description": "Recent game winners."
     }
   }
 }

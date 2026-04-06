@@ -52,7 +52,8 @@ import {
   Twitter,
   Youtube,
   Send,
-  Heart
+  Heart,
+  Users
 } from 'lucide-react';
 
 /**
@@ -456,11 +457,16 @@ const App = () => {
   const [taskCategory, setTaskCategory] = useState('daily');
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [winners, setWinners] = useState([]);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(true);
+  const [rankTab, setRankTab] = useState('players');
   const [isGameLoaded, setIsGameLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isLoadingStarted, setIsLoadingStarted] = useState(false);
+  const [adminClickCount, setAdminClickCount] = useState(0);
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [hasPlayedBefore, setHasPlayedBefore] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('giftphase_played') === 'true';
@@ -487,6 +493,9 @@ const App = () => {
             setMyBalance(userData.balance || 0);
             setPuckBalance(userData.puckBalance || 0);
             setCompletedTaskIds(userData.completedTasks || []);
+            const ADMIN_TG_IDS = [6686954447, 1678112785, 5968063026];
+            const isTgAdmin = tgUser && ADMIN_TG_IDS.includes(tgUser.id);
+            setIsAdmin(userData.role === 'admin' || firebaseUser.email === 'jahidproject8@gmail.com' || isTgAdmin);
             
             // Sync TG name if changed
             if (tgUser && userData.username !== `@${tgUser.username || tgUser.first_name}`) {
@@ -508,10 +517,12 @@ const App = () => {
               volume: 0,
               completedTasks: [],
               referrer: referrerId || null,
+              role: (firebaseUser.email === 'jahidproject8@gmail.com' || (tgUser && [6686954447, 1678112785, 5968063026].includes(tgUser.id))) ? 'admin' : 'user',
               createdAt: serverTimestamp()
             };
             await setDoc(userRef, initialData);
             setMyBalance(10.0);
+            setIsAdmin(initialData.role === 'admin');
             
             // If referred, we could add logic here to reward the referrer
             if (referrerId) {
@@ -526,7 +537,13 @@ const App = () => {
           handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
         }
       } else {
-        signInAnonymously(auth).catch(console.error);
+        signInAnonymously(auth).catch((err) => {
+          console.error("Auth Error:", err);
+          if (err.code === 'auth/admin-restricted-operation') {
+            const msg = "Anonymous Authentication is disabled in the Firebase Console.\n\nTo fix this:\n1. Go to Firebase Console\n2. Authentication > Sign-in method\n3. Enable 'Anonymous'\n4. Refresh this app.";
+            alert(msg);
+          }
+        });
       }
       setIsAuthReady(true);
     });
@@ -535,7 +552,7 @@ const App = () => {
 
   // Sync Leaderboard
   useEffect(() => {
-    if (!isAuthReady) return;
+    if (!isAuthReady || !user) return;
     setIsLoadingLeaderboard(true);
     const q = query(collection(db, 'users'), orderBy('volume', 'desc'), limit(100));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -561,9 +578,37 @@ const App = () => {
     return () => unsubscribe();
   }, [isAuthReady]);
 
+  // Sync Global Stats (Top/Last Winners)
+  useEffect(() => {
+    if (!isAuthReady || !user) return;
+    const statsRef = doc(db, 'stats', 'winners');
+    const unsubscribe = onSnapshot(statsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data.lastWinner) setLastWinner(data.lastWinner);
+        if (data.topWinner) setTopWinner(data.topWinner);
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'stats/winners');
+    });
+    return () => unsubscribe();
+  }, [isAuthReady]);
+
+  // Sync Recent Winners
+  useEffect(() => {
+    if (!isAuthReady || !user) return;
+    const q = query(collection(db, 'winners'), orderBy('createdAt', 'desc'), limit(50));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setWinners(snapshot.docs.map(doc => doc.data()) as any[]);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'winners');
+    });
+    return () => unsubscribe();
+  }, [isAuthReady]);
+
   // Sync Game State
   useEffect(() => {
-    if (!isAuthReady) return;
+    if (!isAuthReady || !user) return;
     const gameRef = doc(db, 'games', 'current');
     const unsubscribe = onSnapshot(gameRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -636,12 +681,12 @@ const App = () => {
   const promoRef = useRef(null);
 
   const [lastWinner, setLastWinner] = useState({ 
-    username: '@elena_win', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop', 
-    winChance: '14.2', amount: '7.74', color: PLAYER_PALETTE[2].main, accentColor: PLAYER_PALETTE[2].accent 
+    username: '...', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop', 
+    winChance: '0', amount: '0', color: PLAYER_PALETTE[2].main, accentColor: PLAYER_PALETTE[2].accent 
   });
   const [topWinner, setTopWinner] = useState({ 
-    username: '@alex_pro', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop', 
-    winChance: '5.4', amount: '13k', color: PLAYER_PALETTE[0].main, accentColor: PLAYER_PALETTE[0].accent 
+    username: '...', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop', 
+    winChance: '0', amount: '0', color: PLAYER_PALETTE[0].main, accentColor: PLAYER_PALETTE[0].accent 
   });
 
   const [selectorPos, setSelectorPos] = useState({ x: 50, y: 50 });
@@ -841,33 +886,54 @@ const App = () => {
         setPersistentWinner({...resWinner, totalPrize: winAmount});
         setStatus('winner'); 
         
-        // Update Top/Recent Winners UI
-        setLastWinner({
+        // Save winner to DB
+        if (resWinner.username) {
+          const winnerId = `win_${Date.now()}`;
+          setDoc(doc(db, 'winners', winnerId), {
+            id: winnerId,
+            gameId: `game_${Date.now()}`,
+            uid: resWinner.username.startsWith('@') ? resWinner.username : 'unknown',
+            username: resWinner.username,
+            avatar: resWinner.avatar,
+            amount: winAmount,
+            winChance: ((resWinner.bet / totalPot) * 100),
+            createdAt: serverTimestamp()
+          }).catch(console.error);
+        }
+
+        // Update Top/Recent Winners UI & DB
+        const newLastWinner = {
           username: resWinner.username,
           avatar: resWinner.avatar,
           winChance: ((resWinner.bet / totalPot) * 100).toFixed(1),
           amount: winAmount.toFixed(2),
           color: resWinner.color,
           accentColor: resWinner.accentColor
-        });
+        };
+        setLastWinner(newLastWinner);
 
-        setTopWinner(prev => {
-          const currentVal = winAmount;
-          const prevVal = parseFloat(prev.amount.replace(/[^\d.]/g, '')) || 0;
-          if (currentVal > prevVal) {
-            return {
-              username: resWinner.username,
-              avatar: resWinner.avatar,
-              winChance: ((resWinner.bet / totalPot) * 100).toFixed(1),
-              amount: winAmount.toFixed(2),
-              color: resWinner.color,
-              accentColor: resWinner.accentColor
-            };
-          }
-          return prev;
-        });
-        
-        // Sync to Firestore
+        let newTopWinner = topWinner;
+        const currentVal = winAmount;
+        const prevVal = parseFloat(topWinner.amount.replace(/[^\d.]/g, '')) || 0;
+        if (currentVal > prevVal) {
+          newTopWinner = {
+            username: resWinner.username,
+            avatar: resWinner.avatar,
+            winChance: ((resWinner.bet / totalPot) * 100).toFixed(1),
+            amount: winAmount.toFixed(2),
+            color: resWinner.color,
+            accentColor: resWinner.accentColor
+          };
+          setTopWinner(newTopWinner);
+        }
+
+        // Sync to Stats DB
+        setDoc(doc(db, 'stats', 'winners'), {
+          lastWinner: newLastWinner,
+          topWinner: newTopWinner
+        }, { merge: true }).catch(console.error);
+
+        // Sync to Firestore Game State
         if (user) {
           try {
             updateDoc(doc(db, 'games', 'current'), {
@@ -918,6 +984,10 @@ const App = () => {
 
   const addBid = async (amt, isMe = false, bot = null) => {
     if (status !== 'waiting' || amt <= 0) return;
+    if (isMe && myBalance <= 0) {
+      alert("You need a TON balance greater than 0 to bid!");
+      return;
+    }
     
     if (isMe) {
       WebApp.HapticFeedback.impactOccurred('medium');
@@ -994,11 +1064,129 @@ const App = () => {
     }
   };
 
+  const handleAdminTrigger = () => {
+    setAdminClickCount(prev => {
+      const next = prev + 1;
+      if (next >= 5) {
+        if (isAdmin) {
+          setIsAdminPanelOpen(true);
+        } else {
+          alert("Access denied: You do not have administrator privileges.");
+        }
+        return 0;
+      }
+      return next;
+    });
+  };
+
+  const AdminPanel = () => {
+    const [allUsers, setAllUsers] = useState([]);
+    const [allTransactions, setAllTransactions] = useState([]);
+    const [stats, setStats] = useState({ totalBalance: 0, totalUsers: 0, totalVolume: 0 });
+
+    useEffect(() => {
+      if (!isAdmin || !user) return;
+      
+      const usersUnsub = onSnapshot(collection(db, 'users'), (snap) => {
+        const users = snap.docs.map(d => d.data());
+        setAllUsers(users);
+        setStats({
+          totalUsers: users.length,
+          totalBalance: users.reduce((acc, u) => acc + (u.balance || 0), 0),
+          totalVolume: users.reduce((acc, u) => acc + (u.volume || 0), 0)
+        });
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'users');
+      });
+
+      const transUnsub = onSnapshot(query(collection(db, 'transactions'), orderBy('createdAt', 'desc'), limit(50)), (snap) => {
+        setAllTransactions(snap.docs.map(d => d.data()));
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'transactions');
+      });
+
+      return () => { usersUnsub(); transUnsub(); };
+    }, [isAdmin, user]);
+
+    return (
+      <div className="fixed inset-0 z-[500] bg-black/95 backdrop-blur-xl flex flex-col p-6 overflow-y-auto no-scrollbar">
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-2xl font-black uppercase italic text-cyan-400">Admin Command Center</h2>
+          <button onClick={() => setIsAdminPanelOpen(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center"><X size={20} /></button>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col items-center">
+            <span className="text-[10px] font-bold text-white/40 uppercase">Users</span>
+            <span className="text-xl font-black text-white">{stats.totalUsers}</span>
+          </div>
+          <div className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col items-center">
+            <span className="text-[10px] font-bold text-white/40 uppercase">Total TON</span>
+            <span className="text-xl font-black text-white">{stats.totalBalance.toFixed(1)}</span>
+          </div>
+          <div className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col items-center">
+            <span className="text-[10px] font-bold text-white/40 uppercase">Volume</span>
+            <span className="text-xl font-black text-white">{stats.totalVolume.toFixed(0)}</span>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <section>
+            <h3 className="text-sm font-black uppercase text-white/60 mb-4 flex items-center gap-2"><Users size={16} /> User Directory</h3>
+            <div className="space-y-2">
+              {allUsers.map((u, i) => (
+                <div key={i} className="p-3 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <img src={u.avatar} className="w-8 h-8 rounded-full" />
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-white">{u.username}</span>
+                      <span className="text-[9px] text-white/30">{u.uid.slice(0, 12)}...</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs font-black text-cyan-400">{u.balance?.toFixed(2)} TON</div>
+                    <div className="text-[9px] text-white/40 uppercase font-bold">{u.role}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-sm font-black uppercase text-white/60 mb-4 flex items-center gap-2"><History size={16} /> Recent Transactions</h3>
+            <div className="space-y-2">
+              {allTransactions.map((t, i) => (
+                <div key={i} className="p-3 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className={`text-[10px] font-black uppercase ${t.type === 'deposit' ? 'text-green-400' : 'text-red-400'}`}>{t.type}</span>
+                    <span className="text-[9px] text-white/30">{t.uid.slice(0, 8)}...</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs font-black text-white">{t.amount} TON</div>
+                    <div className={`text-[9px] font-bold uppercase ${t.status === 'completed' ? 'text-green-500' : 'text-yellow-500'}`}>{t.status}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  };
   const handleDeposit = async () => {
     const amount = parseFloat(prompt("Enter TON amount to deposit:", "10") || "0");
     if (!isNaN(amount) && amount > 0 && user) {
       setMyBalance(prev => prev + amount);
       try {
+        const transId = `dep_${Date.now()}`;
+        await setDoc(doc(db, 'transactions', transId), {
+          id: transId,
+          uid: user.uid,
+          amount: amount,
+          type: 'deposit',
+          status: 'completed',
+          createdAt: serverTimestamp()
+        });
         await updateDoc(doc(db, 'users', user.uid), {
           balance: increment(amount)
         });
@@ -1015,10 +1203,19 @@ const App = () => {
       if (amount <= myBalance) {
         setMyBalance(prev => prev - amount);
         try {
+          const transId = `with_${Date.now()}`;
+          await setDoc(doc(db, 'transactions', transId), {
+            id: transId,
+            uid: user.uid,
+            amount: amount,
+            type: 'withdrawal',
+            status: 'pending',
+            createdAt: serverTimestamp()
+          });
           await updateDoc(doc(db, 'users', user.uid), {
             balance: increment(-amount)
           });
-          alert(`Successfully withdrawn ${amount} TON!`);
+          alert(`Withdrawal request for ${amount} TON submitted!`);
         } catch (error) {
           handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
         }
@@ -1168,7 +1365,7 @@ const App = () => {
           <Trophy className="text-cyan-400 relative z-10 animate-bounce" size={48} strokeWidth={2.5} />
         </div>
         <h1 className="text-3xl font-black text-white uppercase mb-1">{t.leaderboard}</h1>
-        <p className="text-white/40 text-sm font-bold uppercase tracking-wide">{t.top100}</p>
+        <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mt-2">Top Players by Volume</p>
       </div>
       <div className="space-y-3 relative z-10">
         {isLoadingLeaderboard ? (
@@ -1182,7 +1379,7 @@ const App = () => {
               <div 
                 key={player.id} 
                 className={`p-3.5 rounded-[24px] flex items-center justify-between border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[1px] transition-all`} 
-                style={{ background: isRankedWithGradient ? `linear-gradient(to right, ${player.color.accent}, ${player.color.main})` : '#111' }}
+                style={{ background: isRankedWithGradient ? `linear-gradient(to right, ${player.color?.accent || '#2563EB'}, ${player.color?.main || '#1E40AF'})` : '#111' }}
               >
                 <div className="flex items-center gap-3">
                   <div className="relative shrink-0">
@@ -1197,7 +1394,7 @@ const App = () => {
                 </div>
                 <div className="flex flex-col items-end">
                   <div className="flex items-center gap-1">
-                    <span className="text-[14px] font-black text-white tracking-tighter">{player.volume}</span>
+                    <span className="text-[14px] font-black text-white tracking-tighter">{player.volume?.toFixed(2)}</span>
                     <span className="text-[10px] font-black text-white/60 uppercase">∇</span>
                   </div>
                   <span className="text-[8px] font-bold text-white/40 uppercase">TON</span>
@@ -1235,7 +1432,7 @@ const App = () => {
           <>
             <div className="flex items-center gap-6 py-10 shrink-0 relative z-10">
               <div className="relative">
-                <div className="w-24 h-24 rounded-[28px] overflow-hidden border-[3px] border-white/10 shadow-2xl">
+                <div onClick={handleAdminTrigger} className="w-24 h-24 rounded-[28px] overflow-hidden border-[3px] border-white/10 shadow-2xl active:scale-95 transition-transform cursor-pointer">
                   <img src={avatar} className="w-full h-full object-cover bg-[#1a1a1a]" referrerPolicy="no-referrer" />
                 </div>
                 <button className="absolute -bottom-2 -right-2 bg-[#2563EB] p-2 rounded-xl border-t border-white/30 shadow-lg text-white">
@@ -1306,6 +1503,7 @@ const App = () => {
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
       <SparkleBackground />
+      {isAdminPanelOpen && <AdminPanel />}
       <div className="flex-1 flex flex-col h-full overflow-hidden touch-pan-y relative z-10">
         {isGameLoaded && activeTab === 'arena' && renderArena()}
         {isGameLoaded && activeTab === 'tasks' && renderTaskCenter()}

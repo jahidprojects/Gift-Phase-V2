@@ -29,6 +29,29 @@ service cloud.firestore {
     //   - createdAt: timestamp (required)
     // ===============================================================
 
+    // Collection: transactions
+    // Document ID: {transactionId}
+    // Fields:
+    //   - id: string (required)
+    //   - uid: string (required)
+    //   - amount: number (required, > 0)
+    //   - type: string (required, ['deposit', 'withdrawal'])
+    //   - status: string (required, ['pending', 'completed', 'failed'])
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: winners
+    // Document ID: {winnerId}
+    // Fields:
+    //   - id: string (required)
+    //   - gameId: string (required)
+    //   - uid: string (required)
+    //   - username: string (required)
+    //   - avatar: string (required)
+    //   - amount: number (required, >= 0)
+    //   - winChance: number (required, >= 0)
+    //   - createdAt: timestamp (required)
+    // ===============================================================
+
     // ===============================================================
     // Helper Functions
     // ===============================================================
@@ -42,19 +65,29 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.tgId in [6686954447, 1678112785, 5968063026])) ||
          (request.auth.token.email == "jahidproject8@gmail.com" && request.auth.token.email_verified == true));
     }
 
+    function isAllowedAdmin(data) {
+      return data.role == 'admin' && 
+             (data.tgId in [6686954447, 1678112785, 5968063026] || 
+              (request.auth.token.email == "jahidproject8@gmail.com" && request.auth.token.email_verified == true));
+    }
+
     function isValidUser(data) {
-      return data.keys().hasAll(['uid', 'username', 'avatar', 'balance', 'wins', 'volume', 'completedTasks']) &&
+      return data.keys().hasAll(['uid', 'username', 'avatar', 'balance', 'wins', 'volume', 'completedTasks', 'role', 'tgId']) &&
              data.uid == request.auth.uid &&
              data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
              data.avatar is string && data.avatar.size() < 500 &&
              data.balance is number && data.balance >= 0 &&
              data.wins is number && data.wins >= 0 &&
              data.volume is number && data.volume >= 0 &&
-             data.completedTasks is list && data.completedTasks.size() < 100;
+             data.completedTasks is list && data.completedTasks.size() < 100 &&
+             data.role in ['user', 'admin'] &&
+             (data.tgId == null || data.tgId is int);
     }
 
     function isValidGame(data) {
@@ -66,21 +99,61 @@ service cloud.firestore {
              data.createdAt is timestamp;
     }
 
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['id', 'uid', 'amount', 'type', 'status', 'createdAt']) &&
+             data.id is string &&
+             data.uid == request.auth.uid &&
+             data.amount is number && data.amount > 0 &&
+             data.type in ['deposit', 'withdrawal'] &&
+             data.status in ['pending', 'completed', 'failed'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidWinner(data) {
+      return data.keys().hasAll(['id', 'gameId', 'uid', 'username', 'amount', 'createdAt']) &&
+             data.id is string &&
+             data.gameId is string &&
+             data.uid is string &&
+             data.username is string &&
+             data.amount is number && data.amount >= 0 &&
+             data.createdAt is timestamp;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
 
+    match /stats/{statId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
     match /users/{userId} {
-      allow read: if isAuthenticated(); // Allow reading other users for leaderboard
-      allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
-                      request.resource.data.uid == resource.data.uid; // UID immutable
+      allow get: if isAuthenticated();
+      allow list: if isAdmin() || (request.query.limit != null && request.query.limit <= 100);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                     (request.resource.data.role == 'user' || isAllowedAdmin(request.resource.data));
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
+                       request.resource.data.uid == resource.data.uid && // UID immutable
+                       request.resource.data.role == resource.data.role) || // Role immutable for users
+                       isAdmin();
     }
 
     match /games/{gameId} {
       allow read: if true; // Publicly readable for live game
-      allow create, update: if isAuthenticated(); // For simplicity in this demo, allow authenticated users to update game state.
-      // In a real production app, this would be handled by a secure backend/cloud function.
+      allow create, update: if isAdmin(); // Only admins can manage game state
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isOwner(resource.data.uid) || isAdmin();
+      allow create: if isAuthenticated() && isValidTransaction(request.resource.data);
+      allow update: if isAdmin();
+    }
+
+    match /winners/{winnerId} {
+      allow read: if true; // Publicly readable for leaderboard
+      allow create: if isAuthenticated() && isValidWinner(request.resource.data);
+      allow update: if isAdmin();
     }
 
     // Default deny
