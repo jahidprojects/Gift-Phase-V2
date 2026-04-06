@@ -22,6 +22,19 @@ import {
   arrayUnion,
   getDocFromServer
 } from 'firebase/firestore';
+
+// Validate Connection to Firestore
+const testConnection = async () => {
+  try {
+    await getDocFromServer(doc(db, '_connection_test', 'status'));
+    console.log("Firebase Connection: Success (giftphasenew)");
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.error("Firebase Connection Error: Please check if Firestore is enabled in giftphasenew.");
+    }
+  }
+};
+testConnection();
 import { 
   Trophy, 
   Zap, 
@@ -536,16 +549,19 @@ const App = () => {
         } catch (error) {
           handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
         }
+        setIsAuthReady(true);
       } else {
         signInAnonymously(auth).catch((err) => {
           console.error("Auth Error:", err);
           if (err.code === 'auth/admin-restricted-operation') {
-            const msg = "Anonymous Authentication is disabled in the Firebase Console.\n\nTo fix this:\n1. Go to Firebase Console\n2. Authentication > Sign-in method\n3. Enable 'Anonymous'\n4. Refresh this app.";
+            const msg = "CRITICAL: Anonymous Authentication is disabled or restricted.\n\nTo fix this:\n1. Go to Firebase Console > Authentication > Sign-in method.\n2. Enable 'Anonymous'.\n3. If it's already enabled, check your Google Cloud Console API Key restrictions and ensure 'Identity Toolkit API' is allowed.\n4. Refresh this app.";
             alert(msg);
+          } else {
+            alert("Authentication Error: " + err.message);
           }
+          setIsAuthReady(true);
         });
       }
-      setIsAuthReady(true);
     });
     return () => unsubscribe();
   }, []);

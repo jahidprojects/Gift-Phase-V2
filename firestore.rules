@@ -50,6 +50,12 @@ service cloud.firestore {
     //   - amount: number (required, >= 0)
     //   - winChance: number (required, >= 0)
     //   - createdAt: timestamp (required)
+    //
+    // Collection: stats
+    // Document ID: winners
+    // Fields:
+    //   - lastWinner: map (required)
+    //   - topWinner: map (required)
     // ===============================================================
 
     // ===============================================================
@@ -119,13 +125,19 @@ service cloud.firestore {
              data.createdAt is timestamp;
     }
 
+    function isValidStats(data) {
+      return data.keys().hasAll(['lastWinner', 'topWinner']) &&
+             data.lastWinner is map &&
+             data.topWinner is map;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
 
     match /stats/{statId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidStats(request.resource.data);
     }
 
     match /users/{userId} {

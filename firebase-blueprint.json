@@ -63,6 +63,15 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "players", "totalPot", "status"]
+    },
+    "WinnerStats": {
+      "title": "Global Winner Stats",
+      "description": "Stores the top and last winner data.",
+      "type": "object",
+      "properties": {
+        "lastWinner": { "type": "object", "description": "The most recent winner." },
+        "topWinner": { "type": "object", "description": "The winner with the largest pot." }
+      }
     }
   },
   "firestore": {
@@ -81,6 +90,10 @@
     "/winners/{winnerId}": {
       "schema": "Winner",
       "description": "Recent game winners."
+    },
+    "/stats/{statId}": {
+      "schema": "WinnerStats",
+      "description": "Global game statistics."
     }
   }
 }
