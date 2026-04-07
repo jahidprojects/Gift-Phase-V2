@@ -26,10 +26,25 @@ async function startServer() {
     }
 
     try {
-      // Extract chat username from link (e.g., https://t.me/channelname -> @channelname)
-      let chatId = link.split("/").pop();
-      if (!chatId.startsWith("@")) {
-        chatId = "@" + chatId;
+      // Extract chat username from link or use as is
+      let chatId = '';
+      try {
+        const url = new URL(link);
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        if (pathParts.length > 0) {
+          chatId = pathParts[0];
+        }
+      } catch (e) {
+        // Not a URL, assume it's a username or ID
+        chatId = link;
+      }
+
+      if (chatId.startsWith('+')) {
+        return res.json({ ok: false, error: "Invite links (+...) are not supported for verification. Please use the channel @username or numeric ID." });
+      }
+
+      if (!chatId.startsWith('@') && !chatId.startsWith('-') && isNaN(Number(chatId))) {
+        chatId = '@' + chatId;
       }
 
       const response = await fetch(

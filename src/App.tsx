@@ -102,45 +102,45 @@ const PLAYER_PALETTE = [
 
 const PROFILE_FRAMES = [
   { id: 'none', name: 'Default', price: 0, color: 'transparent' },
-  { id: 'lvl1', name: 'Bronze Guard', price: 10000, color: '#CD7F32', shadow: '0 0 10px #CD7F32' },
-  { id: 'lvl2', name: 'Iron Shell', price: 25000, color: '#A19D94', shadow: '0 0 12px #A19D94' },
-  { id: 'lvl3', name: 'Silver Crest', price: 50000, color: '#C0C0C0', shadow: '0 0 15px #C0C0C0' },
-  { id: 'lvl4', name: 'Gold Crown', price: 100000, color: '#FFD700', shadow: '0 0 20px #FFD700' },
-  { id: 'lvl5', name: 'Platinum Edge', price: 250000, color: '#E5E4E2', shadow: '0 0 25px #E5E4E2' },
-  { id: 'lvl6', name: 'Ruby Heart', price: 500000, color: '#E11D48', shadow: '0 0 30px #E11D48' },
-  { id: 'lvl7', name: 'Emerald Pulse', price: 750000, color: '#10B981', shadow: '0 0 30px #10B981', animate: 'animate-pulse' },
-  { id: 'lvl8', name: 'Sapphire Flow', price: 1000000, color: '#3B82F6', shadow: '0 0 35px #3B82F6' },
-  { id: 'lvl9', name: 'Amethyst Aura', price: 1500000, color: '#8B5CF6', shadow: '0 0 40px #8B5CF6' },
-  { id: 'lvl10', name: 'Onyx Shadow', price: 2000000, color: '#111', shadow: '0 0 45px rgba(0,0,0,0.8)' },
-  { id: 'lvl11', name: 'Neon Strike', price: 3000000, color: '#22D3EE', shadow: '0 0 50px #22D3EE', borderStyle: 'dashed' },
-  { id: 'lvl12', name: 'Cyber Link', price: 4500000, color: '#F472B6', shadow: '0 0 55px #F472B6', borderStyle: 'double', borderWidth: '4px' },
-  { id: 'lvl13', name: 'Magma Flow', price: 6000000, color: '#F97316', shadow: '0 0 60px #F97316', animate: 'animate-bounce' },
-  { id: 'lvl14', name: 'Glacier Frost', price: 8000000, color: '#93C5FD', shadow: '0 0 65px #93C5FD' },
-  { id: 'lvl15', name: 'Storm Caller', price: 10000000, color: '#FDE047', shadow: '0 0 70px #FDE047', animate: 'animate-pulse' },
-  { id: 'lvl16', name: 'Void Walker', price: 15000000, color: '#4C1D95', shadow: '0 0 80px #4C1D95' },
-  { id: 'lvl17', name: 'Cosmic Dust', price: 25000000, color: '#EC4899', shadow: '0 0 90px #EC4899', borderStyle: 'dotted' },
-  { id: 'lvl18', name: 'Prism Light', price: 50000000, gradient: 'conic-gradient(from 0deg, red, yellow, green, cyan, blue, magenta, red)', shadow: '0 0 100px rgba(255,255,255,0.5)' },
-  { id: 'lvl19', name: 'Dragon Soul', price: 100000000, color: '#B91C1C', shadow: '0 0 120px #B91C1C', borderWidth: '6px' },
-  { id: 'lvl20', name: 'Godly Halo', price: 250000000, color: '#FACC15', shadow: '0 0 150px #FACC15', borderWidth: '8px', animate: 'animate-spin-slow' },
+  { id: 'lvl1', name: 'Bronze Guard', price: 10000, color: '#CD7F32', shadow: '0 0 15px rgba(205, 127, 50, 0.6), inset 0 0 8px rgba(255,255,255,0.3)' },
+  { id: 'lvl2', name: 'Iron Shell', price: 25000, color: '#A19D94', shadow: '0 0 15px rgba(161, 157, 148, 0.6), inset 0 0 8px rgba(255,255,255,0.3)' },
+  { id: 'lvl3', name: 'Silver Crest', price: 50000, color: '#C0C0C0', shadow: '0 0 20px rgba(192, 192, 192, 0.6), inset 0 0 10px rgba(255,255,255,0.4)' },
+  { id: 'lvl4', name: 'Gold Crown', price: 100000, color: '#FFD700', shadow: '0 0 25px rgba(255, 215, 0, 0.7), inset 0 0 12px rgba(255,255,255,0.5)' },
+  { id: 'lvl5', name: 'Platinum Edge', price: 250000, color: '#E5E4E2', shadow: '0 0 25px rgba(229, 228, 226, 0.7), inset 0 0 12px rgba(255,255,255,0.5)' },
+  { id: 'lvl6', name: 'Ruby Heart', price: 500000, color: '#E11D48', shadow: '0 0 30px rgba(225, 29, 72, 0.8), inset 0 0 15px rgba(255,255,255,0.4)' },
+  { id: 'lvl7', name: 'Emerald Pulse', price: 750000, color: '#10B981', shadow: '0 0 30px rgba(16, 185, 129, 0.8), inset 0 0 15px rgba(255,255,255,0.4)', animate: 'animate-pulse' },
+  { id: 'lvl8', name: 'Sapphire Flow', price: 1000000, color: '#3B82F6', shadow: '0 0 35px rgba(59, 130, 246, 0.8), inset 0 0 15px rgba(255,255,255,0.4)' },
+  { id: 'lvl9', name: 'Amethyst Aura', price: 1500000, color: '#8B5CF6', shadow: '0 0 40px rgba(139, 92, 246, 0.8), inset 0 0 20px rgba(255,255,255,0.4)' },
+  { id: 'lvl10', name: 'Onyx Shadow', price: 2000000, color: '#111', shadow: '0 0 45px rgba(0,0,0,0.9), inset 0 0 15px rgba(255,255,255,0.1)' },
+  { id: 'lvl11', name: 'Neon Strike', price: 3000000, color: '#22D3EE', shadow: '0 0 50px rgba(34, 211, 238, 0.9), inset 0 0 20px rgba(255,255,255,0.5)', borderStyle: 'dashed' },
+  { id: 'lvl12', name: 'Cyber Link', price: 4500000, color: '#F472B6', shadow: '0 0 55px rgba(244, 114, 182, 0.9), inset 0 0 20px rgba(255,255,255,0.5)', borderStyle: 'double', borderWidth: '5px' },
+  { id: 'lvl13', name: 'Magma Flow', price: 6000000, color: '#F97316', shadow: '0 0 60px rgba(249, 115, 22, 0.9), inset 0 0 25px rgba(255,255,255,0.5)', animate: 'animate-bounce' },
+  { id: 'lvl14', name: 'Glacier Frost', price: 8000000, color: '#93C5FD', shadow: '0 0 65px rgba(147, 197, 253, 0.9), inset 0 0 25px rgba(255,255,255,0.6)' },
+  { id: 'lvl15', name: 'Storm Caller', price: 10000000, color: '#FDE047', shadow: '0 0 70px rgba(253, 224, 71, 0.9), inset 0 0 30px rgba(255,255,255,0.6)', animate: 'animate-pulse' },
+  { id: 'lvl16', name: 'Void Walker', price: 15000000, color: '#4C1D95', shadow: '0 0 80px rgba(76, 29, 149, 1), inset 0 0 30px rgba(255,255,255,0.3)' },
+  { id: 'lvl17', name: 'Cosmic Dust', price: 25000000, color: '#EC4899', shadow: '0 0 90px rgba(236, 72, 153, 1), inset 0 0 35px rgba(255,255,255,0.4)', borderStyle: 'dotted' },
+  { id: 'lvl18', name: 'Prism Light', price: 50000000, gradient: 'conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)', shadow: '0 0 100px rgba(255,255,255,0.6), inset 0 0 40px rgba(255,255,255,0.5)' },
+  { id: 'lvl19', name: 'Dragon Soul', price: 100000000, color: '#B91C1C', shadow: '0 0 120px rgba(185, 28, 28, 1), inset 0 0 50px rgba(255,255,255,0.4)', borderWidth: '8px' },
+  { id: 'lvl20', name: 'Godly Halo', price: 250000000, color: '#FACC15', shadow: '0 0 150px rgba(250, 204, 21, 1), inset 0 0 60px rgba(255,255,255,0.6)', borderWidth: '10px', animate: 'animate-spin-slow' },
 ];
 
 const ProfileFrame = ({ frameId, children, className = "w-full h-full", shape = "circle" }) => {
   const frame = PROFILE_FRAMES.find(f => f.id === frameId);
-  const radius = shape === 'circle' ? 'rounded-full' : 'rounded-[28px]';
+  const radius = shape === 'circle' ? 'rounded-full' : 'rounded-[32px]';
   
   if (!frame || frameId === 'none') return <div className={`${className} ${radius} overflow-hidden`}>{children}</div>;
   
   return (
-    <div className={`relative ${className} flex items-center justify-center p-[3px]`}>
+    <div className={`relative ${className} flex items-center justify-center p-[4px]`}>
       <div 
-        className={`absolute inset-0 ${radius} z-0 ${frame.animate || ''}`} 
+        className={`absolute inset-0 ${radius} z-0 ${frame.animate || ''} shadow-2xl`} 
         style={{ 
           background: frame.gradient || 'transparent',
-          border: frame.gradient ? 'none' : `${frame.borderWidth || '3px'} ${frame.borderStyle || 'solid'} ${frame.color}`,
+          border: frame.gradient ? 'none' : `${frame.borderWidth || '4px'} ${frame.borderStyle || 'solid'} ${frame.color}`,
           boxShadow: frame.shadow || 'none'
         }}
       ></div>
-      <div className={`w-full h-full ${radius} overflow-hidden relative z-10 bg-black`}>
+      <div className={`w-full h-full ${radius} overflow-hidden relative z-10 bg-black/40 backdrop-blur-sm`}>
         {children}
       </div>
     </div>
@@ -313,6 +313,8 @@ const ACTIVITIES = [
   { type: 'withdraw', val: '-20.0 TON', date: '2 days ago', icon: <ArrowUpCircle size={16} /> },
 ];
 
+const DEFAULT_AVATAR = "https://api.dicebear.com/7.x/identicon/svg?seed=User";
+
 const PROMO_BANNERS = [
   { id: 1, title: 'WIN BIG IN ARENA', desc: 'Predict the puck & win TON daily!', grad: 'from-[#0891B2] to-[#2563EB]', icon: <Gamepad2 size={32} /> },
   { id: 2, title: 'INVITE & EARN 10%', desc: 'Get rewards for every friend spending.', grad: 'from-[#E11D48] to-[#C026D3]', icon: <UserPlus size={32} /> },
@@ -384,7 +386,7 @@ const LoadingScreen = ({ onPlay, onShare, progress, isStarted }: { onPlay: () =>
       
       <div className="w-full max-w-xs bg-[#4F86C6]/80 backdrop-blur-md rounded-[40px] p-8 flex flex-col items-center shadow-2xl border border-white/20 relative z-10">
         <div className="w-24 h-24 bg-gradient-to-br from-orange-400 to-yellow-300 rounded-3xl mb-6 flex items-center justify-center shadow-lg overflow-hidden border-2 border-white/30">
-           <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop" className="w-full h-full object-cover" alt="Gift Phase V2" referrerPolicy="no-referrer" />
+           <img src={DEFAULT_AVATAR} className="w-full h-full object-cover" alt="Gift Phase V2" referrerPolicy="no-referrer" />
         </div>
         <h1 className="text-3xl font-black text-white uppercase tracking-tight mb-8 text-center">Gift Phase V2</h1>
         
@@ -605,7 +607,7 @@ const App = () => {
               uid: firebaseUser.uid,
               tgId: tgUser?.id || null,
               username: tgUser ? `@${tgUser.username || tgUser.first_name}` : `User_${firebaseUser.uid.slice(0, 5)}`,
-              avatar: tgUser?.photo_url || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop',
+              avatar: tgUser?.photo_url || DEFAULT_AVATAR,
               balance: 10.0,
               puckBalance: 100000,
               wins: 0,
@@ -781,11 +783,11 @@ const App = () => {
   const promoRef = useRef(null);
 
   const [lastWinner, setLastWinner] = useState({ 
-    username: '...', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop', 
+    username: '...', avatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=Winner1', 
     winChance: '0', amount: '0', color: PLAYER_PALETTE[2].main, accentColor: PLAYER_PALETTE[2].accent 
   });
   const [topWinner, setTopWinner] = useState({ 
-    username: '...', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop', 
+    username: '...', avatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=Winner2', 
     winChance: '0', amount: '0', color: PLAYER_PALETTE[0].main, accentColor: PLAYER_PALETTE[0].accent 
   });
 
@@ -1040,8 +1042,8 @@ const App = () => {
               status: 'winner',
               winner: resWinner
             });
-            // Update winner's stats if it's the current user
-            if (resWinner.isMe) {
+            // Update winner's stats if it's the current user (STRICT UID CHECK)
+            if (resWinner.uid === user.uid) {
               updateDoc(doc(db, 'users', user.uid), {
                 wins: increment(1),
                 balance: increment(totalPot)
@@ -1097,7 +1099,7 @@ const App = () => {
     
     const tgUser = WebApp.initDataUnsafe?.user;
     const n = isMe ? (tgUser ? `@${tgUser.username || tgUser.first_name}` : 'User') : bot.name;
-    const a = isMe ? (tgUser?.photo_url || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop') : bot.avatar;
+    const a = isMe ? (tgUser?.photo_url || DEFAULT_AVATAR) : bot.avatar;
     
     if (isMe) {
       setMyBalance(prev => Math.max(0, prev - finalAmt));
@@ -1129,10 +1131,14 @@ const App = () => {
       const existingIdx = currentPlayers.findIndex(p => p.username === n);
       if (existingIdx > -1) {
         currentPlayers[existingIdx].bet += finalAmt;
-        if (isMe) currentPlayers[existingIdx].selectedFrame = userData?.selectedFrame || 'none';
+        if (isMe) {
+          currentPlayers[existingIdx].selectedFrame = userData?.selectedFrame || 'none';
+          currentPlayers[existingIdx].uid = user.uid;
+        }
       } else if (currentPlayers.length < 15) {
         const pal = PLAYER_PALETTE[currentPlayers.length % PLAYER_PALETTE.length];
         const newPlayer = { 
+          uid: isMe ? user.uid : (bot ? bot.id : `bot_${Date.now()}`),
           username: n, 
           avatar: a, 
           bet: finalAmt, 
@@ -1512,26 +1518,14 @@ const App = () => {
                     onClick={async () => {
                       if (confirm("This will add 20 achievement tasks. Continue?")) {
                         const tasks = [
-                          { id: 'ach_ref_1', title: 'Referral Master I', description: 'Refer 1 friend to join Gift Phase.', reward: 50000, rewardType: 'PUCK', type: 'achievement', verificationType: 'referral', requiredCount: 1, color: '#E11D48', icon: 'UserPlus', btn: 'Claim' },
-                          { id: 'ach_ref_2', title: 'Referral Master II', description: 'Refer 5 friends to join Gift Phase.', reward: 250000, rewardType: 'PUCK', type: 'achievement', verificationType: 'referral', requiredCount: 5, color: '#E11D48', icon: 'UserPlus', btn: 'Claim' },
-                          { id: 'ach_ref_3', title: 'Referral Master III', description: 'Refer 10 friends to join Gift Phase.', reward: 500000, rewardType: 'PUCK', type: 'achievement', verificationType: 'referral', requiredCount: 10, color: '#E11D48', icon: 'UserPlus', btn: 'Claim' },
-                          { id: 'ach_ref_4', title: 'Referral Master IV', description: 'Refer 25 friends to join Gift Phase.', reward: 1500000, rewardType: 'PUCK', type: 'achievement', verificationType: 'referral', requiredCount: 25, color: '#E11D48', icon: 'UserPlus', btn: 'Claim' },
-                          { id: 'ach_ref_5', title: 'Referral Master V', description: 'Refer 50 friends to join Gift Phase.', reward: 3500000, rewardType: 'PUCK', type: 'achievement', verificationType: 'referral', requiredCount: 50, color: '#E11D48', icon: 'UserPlus', btn: 'Claim' },
-                          { id: 'ach_ref_6', title: 'Referral Master VI', description: 'Refer 100 friends to join Gift Phase.', reward: 10000000, rewardType: 'PUCK', type: 'achievement', verificationType: 'referral', requiredCount: 100, color: '#E11D48', icon: 'UserPlus', btn: 'Claim' },
-                          { id: 'ach_game_1', title: 'Game Enthusiast I', description: 'Play 10 games in the Arena.', reward: 10000, rewardType: 'PUCK', type: 'achievement', verificationType: 'game', requiredCount: 10, color: '#7C3AED', icon: 'Gamepad2', btn: 'Claim' },
-                          { id: 'ach_game_2', title: 'Game Enthusiast II', description: 'Play 50 games in the Arena.', reward: 60000, rewardType: 'PUCK', type: 'achievement', verificationType: 'game', requiredCount: 50, color: '#7C3AED', icon: 'Gamepad2', btn: 'Claim' },
-                          { id: 'ach_game_3', title: 'Game Enthusiast III', description: 'Play 100 games in the Arena.', reward: 150000, rewardType: 'PUCK', type: 'achievement', verificationType: 'game', requiredCount: 100, color: '#7C3AED', icon: 'Gamepad2', btn: 'Claim' },
-                          { id: 'ach_game_4', title: 'Game Enthusiast IV', description: 'Play 500 games in the Arena.', reward: 1000000, rewardType: 'PUCK', type: 'achievement', verificationType: 'game', requiredCount: 500, color: '#7C3AED', icon: 'Gamepad2', btn: 'Claim' },
-                          { id: 'ach_game_5', title: 'Game Enthusiast V', description: 'Play 1000 games in the Arena.', reward: 2500000, rewardType: 'PUCK', type: 'achievement', verificationType: 'game', requiredCount: 1000, color: '#7C3AED', icon: 'Gamepad2', btn: 'Claim' },
-                          { id: 'ach_win_1', title: 'Winner Circle I', description: 'Win 1 game in the Arena.', reward: 25000, rewardType: 'PUCK', type: 'achievement', verificationType: 'win', requiredCount: 1, color: '#059669', icon: 'Trophy', btn: 'Claim' },
-                          { id: 'ach_win_2', title: 'Winner Circle II', description: 'Win 5 games in the Arena.', reward: 150000, rewardType: 'PUCK', type: 'achievement', verificationType: 'win', requiredCount: 5, color: '#059669', icon: 'Trophy', btn: 'Claim' },
-                          { id: 'ach_win_3', title: 'Winner Circle III', description: 'Win 10 games in the Arena.', reward: 350000, rewardType: 'PUCK', type: 'achievement', verificationType: 'win', requiredCount: 10, color: '#059669', icon: 'Trophy', btn: 'Claim' },
-                          { id: 'ach_win_4', title: 'Winner Circle IV', description: 'Win 25 games in the Arena.', reward: 1000000, rewardType: 'PUCK', type: 'achievement', verificationType: 'win', requiredCount: 25, color: '#059669', icon: 'Trophy', btn: 'Claim' },
-                          { id: 'ach_win_5', title: 'Winner Circle V', description: 'Win 50 games in the Arena.', reward: 2500000, rewardType: 'PUCK', type: 'achievement', verificationType: 'win', requiredCount: 50, color: '#059669', icon: 'Trophy', btn: 'Claim' },
-                          { id: 'ach_dep_1', title: 'High Roller I', description: 'Deposit 1 TON into your balance.', reward: 100000, rewardType: 'PUCK', type: 'achievement', verificationType: 'deposit', requiredCount: 1, color: '#2563EB', icon: 'Wallet', btn: 'Claim' },
-                          { id: 'ach_dep_2', title: 'High Roller II', description: 'Deposit 5 TON into your balance.', reward: 600000, rewardType: 'PUCK', type: 'achievement', verificationType: 'deposit', requiredCount: 5, color: '#2563EB', icon: 'Wallet', btn: 'Claim' },
-                          { id: 'ach_dep_3', title: 'High Roller III', description: 'Deposit 10 TON into your balance.', reward: 1500000, rewardType: 'PUCK', type: 'achievement', verificationType: 'deposit', requiredCount: 10, color: '#2563EB', icon: 'Wallet', btn: 'Claim' },
-                          { id: 'ach_shop_1', title: 'Shopaholic I', description: 'Make 1 purchase in the Shop.', reward: 50000, rewardType: 'PUCK', type: 'achievement', verificationType: 'purchase', requiredCount: 1, color: '#D97706', icon: 'Store', btn: 'Claim' },
+                          { id: 'ach_game_1', title: 'Play Arena 1 Match', description: 'Play 1 match in the Arena.', reward: 10000, rewardType: 'PUCK', type: 'achievement', verificationType: 'game', requiredCount: 1, color: '#7C3AED', icon: 'Gamepad2', btn: 'Claim' },
+                          { id: 'ach_game_2', title: 'Play Arena 5 Matches', description: 'Play 5 matches in the Arena.', reward: 50000, rewardType: 'PUCK', type: 'achievement', verificationType: 'game', requiredCount: 5, color: '#7C3AED', icon: 'Gamepad2', btn: 'Claim' },
+                          { id: 'ach_win_1', title: 'Win Arena 1 Match', description: 'Win 1 match in the Arena.', reward: 25000, rewardType: 'PUCK', type: 'achievement', verificationType: 'win', requiredCount: 1, color: '#059669', icon: 'Trophy', btn: 'Claim' },
+                          { id: 'ach_win_2', title: 'Win Arena 5 Matches', description: 'Win 5 matches in the Arena.', reward: 150000, rewardType: 'PUCK', type: 'achievement', verificationType: 'win', requiredCount: 5, color: '#059669', icon: 'Trophy', btn: 'Claim' },
+                          { id: 'ach_dep_1', title: 'Deposit 1 TON', description: 'Deposit 1 TON into your balance.', reward: 100000, rewardType: 'PUCK', type: 'achievement', verificationType: 'deposit', requiredCount: 1, color: '#2563EB', icon: 'Wallet', btn: 'Claim' },
+                          { id: 'ach_ref_1', title: 'Invite a friend', description: 'Refer 1 friend to join Gift Phase.', reward: 50000, rewardType: 'PUCK', type: 'achievement', verificationType: 'referral', requiredCount: 1, color: '#E11D48', icon: 'UserPlus', btn: 'Claim' },
+                          { id: 'ach_shop_1', title: 'First Purchase in Shop', description: 'Make your first purchase in the Shop.', reward: 50000, rewardType: 'PUCK', type: 'achievement', verificationType: 'purchase', requiredCount: 1, color: '#D97706', icon: 'Store', btn: 'Claim' },
+                          { id: 'ach_shop_2', title: '5th Purchase in Shop', description: 'Make 5 purchases in the Shop.', reward: 250000, rewardType: 'PUCK', type: 'achievement', verificationType: 'purchase', requiredCount: 5, color: '#D97706', icon: 'Store', btn: 'Claim' },
                         ];
                         try {
                           for (const t of tasks) {
@@ -1588,7 +1582,16 @@ const App = () => {
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/5">
-                        <CheckSquare size={24} className="text-rose-400" />
+                        {(() => {
+                          const title = (task.title || '').toLowerCase();
+                          const link = (task.link || '').toLowerCase();
+                          if (title.includes('deposit')) return <Wallet size={24} className="text-rose-400" />;
+                          if (link.includes('t.me')) {
+                            if (link.includes('bot')) return <Gamepad2 size={24} className="text-rose-400" />;
+                            return <Send size={24} className="text-rose-400 rotate-[-20deg]" />;
+                          }
+                          return <CheckSquare size={24} className="text-rose-400" />;
+                        })()}
                       </div>
                       <div className="flex flex-col">
                         <span className="text-base font-black text-white">{task.title}</span>
@@ -2101,32 +2104,43 @@ const App = () => {
             {players.length > 5 && <div className="w-5 h-5 rounded-full bg-[#222] border border-black flex items-center justify-center text-[7px] font-black">+{players.length - 5}</div>}
           </div>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-4">
           {players.map((p, i) => {
             const frame = PROFILE_FRAMES.find(f => f.id === p.selectedFrame);
             return (
-              <div key={i} className="p-3.5 rounded-[24px] flex items-center justify-between border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[1px] transition-all relative overflow-hidden" style={{ background: `linear-gradient(to right, ${p.accentColor}, ${p.color})` }}>
-                {frame && frame.id !== 'none' && (
-                  <div className="absolute inset-0 opacity-20 pointer-events-none animate-pulse" style={{ background: `radial-gradient(circle at center, ${frame.color}, transparent)` }}></div>
-                )}
-                <div className="flex items-center gap-3 relative z-10">
+              <div key={i} className="p-4 rounded-[32px] flex items-center justify-between border border-white/5 shadow-2xl relative overflow-hidden group transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ background: `linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))` }}>
+                {/* Animated Background Glow */}
+                <div className="absolute inset-0 opacity-10 pointer-events-none transition-opacity group-hover:opacity-20" style={{ background: `radial-gradient(circle at 20% 50%, ${p.color}, transparent 70%)` }}></div>
+                
+                {/* Shimmer Effect */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_3s_infinite]"></div>
+                </div>
+
+                <div className="flex items-center gap-4 relative z-10">
                   <div className="relative">
-                    <ProfileFrame frameId={p.selectedFrame} className="w-10 h-10">
-                      <img src={p.avatar} className="w-full h-full rounded-full border-[1.5px] border-white/20 shadow-md" alt="" referrerPolicy="no-referrer" />
+                    <ProfileFrame frameId={p.selectedFrame} className="w-14 h-14">
+                      <img src={p.avatar} className="w-full h-full rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
                     </ProfileFrame>
-                    {p.isMe && <div className="absolute -top-1 -right-1 bg-white text-black text-[7px] font-black px-1 rounded-full border border-black/10">YOU</div>}
+                    {p.isMe && <div className="absolute -top-1 -right-1 bg-cyan-400 text-black text-[8px] font-black px-2 py-0.5 rounded-full border border-black/20 shadow-lg">YOU</div>}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[12px] font-black text-white uppercase tracking-tight">{p.username}</span>
-                    <span className="text-[8px] font-bold text-white/50 uppercase tracking-widest">Arena Participant</span>
+                    <span className="text-[14px] font-black text-white uppercase tracking-tight flex items-center gap-2">
+                      {p.username}
+                      {frame && frame.id !== 'none' && <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: frame.color }}></div>}
+                    </span>
+                    <span className="text-[9px] font-bold text-white/30 uppercase tracking-[0.1em]">Arena Participant</span>
                   </div>
                 </div>
+                
                 <div className="flex flex-col items-end relative z-10">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[14px] font-black text-white tracking-tighter">{p.bet.toFixed(2)}</span>
-                    <span className="text-[10px] font-black text-white/60 uppercase">∇</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[18px] font-black text-white tracking-tighter">{p.bet.toFixed(2)}</span>
+                    <div className="w-5 h-5 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                      <span className="text-[10px] text-white/60">∇</span>
+                    </div>
                   </div>
-                  <span className="text-[8px] font-bold text-white/40 uppercase">TON</span>
+                  <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">TON</span>
                 </div>
               </div>
             );
@@ -2303,13 +2317,25 @@ const App = () => {
             // Override with custom color if provided
             const customStyle = task.color ? { background: `linear-gradient(to bottom, ${task.color}, ${task.color}dd)` } : {};
 
+            // Dynamic Icon Matching (Prioritized)
+            const title = (task.title || '').toLowerCase();
+            const link = (task.link || '').toLowerCase();
+            
             let displayIcon = <Bolt size={20} />;
-            if (task.icon) {
+            
+            if (title.includes('deposit')) {
+              displayIcon = <Wallet size={20} />;
+            } else if (link.includes('t.me')) {
+              if (link.includes('bot')) {
+                displayIcon = <Gamepad2 size={20} />;
+              } else {
+                displayIcon = <Send size={20} className="rotate-[-20deg]" />;
+              }
+            } else if (task.icon) {
               const IconComp = getIcon(task.icon);
               displayIcon = <IconComp size={20} />;
             } else {
               if (task.rewardType === 'TON') displayIcon = <Wallet size={20} className="text-white/80" />;
-              else if (task.verificationType === 'channel') displayIcon = <Send size={20} className="rotate-[-20deg]" />;
               else if (task.type === 'achievement') displayIcon = <Gamepad2 size={20} />;
             }
             
@@ -2429,7 +2455,7 @@ const App = () => {
     const tgUser = WebApp.initDataUnsafe?.user;
     const displayName = tgUser ? `${tgUser.first_name} ${tgUser.last_name || ''}`.trim() : (user?.displayName || 'Jahid');
     const username = tgUser ? `@${tgUser.username || tgUser.first_name}` : (user?.uid.slice(-10) || '6686954447');
-    const avatar = tgUser?.photo_url || user?.photoURL || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop";
+    const avatar = tgUser?.photo_url || user?.photoURL || DEFAULT_AVATAR;
 
     return (
       <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative px-4 z-10 pt-12">
@@ -2519,6 +2545,7 @@ const App = () => {
         .fade-in { animation-name: fadeIn; }
         .animate-spin-slow { animation: spin 8s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
       `}</style>
       <SparkleBackground />
       {isAdminPanelOpen && <AdminPanel />}
@@ -2571,7 +2598,7 @@ const App = () => {
                     
                     <div className="w-16 h-16 relative">
                       <ProfileFrame frameId={frame.id} className="w-full h-full">
-                        <img src={user?.photoURL || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&h=200&fit=crop"} className="w-full h-full object-cover rounded-full" alt="" />
+                        <img src={WebApp.initDataUnsafe?.user?.photo_url || user?.photoURL || DEFAULT_AVATAR} className="w-full h-full object-cover rounded-full" alt="" />
                       </ProfileFrame>
                     </div>
                     
