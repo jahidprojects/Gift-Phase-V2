@@ -389,7 +389,7 @@ const Skeleton = ({ className, ...props }: { className?: string; [key: string]: 
 );
 
 // --- LOADING SCREEN ---
-const LoadingScreen = ({ onPlay, onShare, progress, isStarted }: { onPlay: () => void, onShare: () => void, progress: number, isStarted: boolean }) => {
+const LoadingScreen = ({ onPlay, onShare, onLike, isLiked, progress, isStarted }: { onPlay: () => void, onShare: () => void, onLike: () => void, isLiked: boolean, progress: number, isStarted: boolean }) => {
   return (
     <div className="fixed inset-0 z-[300] bg-[#60A5FA] flex flex-col items-center justify-center p-6 font-sans overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
@@ -408,8 +408,11 @@ const LoadingScreen = ({ onPlay, onShare, progress, isStarted }: { onPlay: () =>
             <Send size={18} className="rotate-[-20deg]" />
             Share
           </button>
-          <button className="w-14 h-14 bg-white/20 hover:bg-white/30 rounded-2xl flex items-center justify-center text-white transition-all border-t border-white/20 shadow-lg active:translate-y-[1px]">
-            <Heart size={20} />
+          <button 
+            onClick={onLike}
+            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all border-t shadow-lg active:translate-y-[1px] ${isLiked ? 'bg-red-500/20 border-red-500/30 text-red-500' : 'bg-white/20 hover:bg-white/30 border-white/20 text-white'}`}
+          >
+            <Heart size={20} fill={isLiked ? "currentColor" : "none"} className={isLiked ? "animate-heart-pop" : ""} />
           </button>
         </div>
       </div>
@@ -545,6 +548,7 @@ const App = () => {
   const [rankTab, setRankTab] = useState('players');
   const [isGameLoaded, setIsGameLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isLiked, setIsLiked] = useState(() => localStorage.getItem('giftphase_liked') === 'true');
   const [isLoadingStarted, setIsLoadingStarted] = useState(false);
   const [adminClickCount, setAdminClickCount] = useState(0);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
@@ -2074,7 +2078,16 @@ const App = () => {
       } else {
         setLoadingProgress(currentProgress);
       }
-    }, 100); // 100ms * 50 steps = 5 seconds
+    }, 60); // 60ms * 50 steps = 3 seconds
+  };
+
+  const handleLike = () => {
+    const newLiked = !isLiked;
+    setIsLiked(newLiked);
+    localStorage.setItem('giftphase_liked', String(newLiked));
+    if ((window as any).Telegram?.WebApp?.HapticFeedback) {
+      (window as any).Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+    }
   };
 
   const premium3DStyle = `bg-gradient-to-b from-white/15 to-white/5 border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-[0_2px_0_rgba(0,0,0,0.4)] transition-all duration-75`;
@@ -2567,6 +2580,8 @@ const App = () => {
         <LoadingScreen 
           onPlay={startLoading} 
           onShare={handleShare} 
+          onLike={handleLike}
+          isLiked={isLiked}
           progress={loadingProgress} 
           isStarted={isLoadingStarted} 
         />
@@ -2578,6 +2593,8 @@ const App = () => {
         @keyframes sparkle { 0%, 100% { opacity: 0; transform: scale(0.5); } 50% { opacity: 1; transform: scale(1.4); } }
         @keyframes springUp { 0% { transform: translateY(100%) scale(0.95); opacity: 0; } 70% { transform: translateY(-5%) scale(1.02); opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes heartPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
+        .animate-heart-pop { animation: heartPop 0.4s ease-out; }
         .animate-spring-up { animation: springUp 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
         .preserve-3d { transform-style: preserve-3d; }
         .animate-in { animation-duration: 500ms; animation-fill-mode: both; }
