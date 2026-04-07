@@ -15,6 +15,13 @@
         "completedTasks": { "type": "array", "items": { "type": "string" }, "description": "List of IDs for completed tasks." },
         "referralCode": { "type": "string", "description": "Unique referral code for the user." },
         "referredBy": { "type": "string", "description": "UID of the user who referred this user." },
+        "referralsCount": { "type": "integer", "description": "Number of users referred." },
+        "totalDeposited": { "type": "number", "description": "Total TON deposited." },
+        "totalWithdrawn": { "type": "number", "description": "Total TON withdrawn." },
+        "adsViewed": { "type": "integer", "description": "Total ads viewed." },
+        "spinsCount": { "type": "integer", "description": "Total spins performed." },
+        "promosUsed": { "type": "integer", "description": "Total promo codes used." },
+        "shopPurchases": { "type": "array", "items": { "type": "string" }, "description": "List of shop items purchased." },
         "role": { "type": "string", "enum": ["user", "admin"], "description": "User's role for access control." },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -80,14 +87,17 @@
       "properties": {
         "id": { "type": "string" },
         "title": { "type": "string" },
+        "description": { "type": "string" },
         "reward": { "type": "number" },
-        "type": { "type": "string", "enum": ["daily", "partner", "achievement", "social"] },
+        "rewardType": { "type": "string", "enum": ["PUCK", "TON"] },
+        "type": { "type": "string", "enum": ["daily", "partner", "achievement"] },
+        "verificationType": { "type": "string", "enum": ["none", "channel", "group", "bot"] },
         "btn": { "type": "string" },
         "link": { "type": "string" },
         "completedCount": { "type": "integer" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "title", "reward", "type"]
+      "required": ["id", "title", "reward", "rewardType", "type", "verificationType"]
     },
     "PromoCode": {
       "title": "Promo Code",

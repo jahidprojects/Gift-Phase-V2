@@ -144,7 +144,14 @@ service cloud.firestore {
              data.volume is number && data.volume >= 0 &&
              data.completedTasks is list && data.completedTasks.size() < 100 &&
              data.role in ['user', 'admin'] &&
-             (data.tgId == null || data.tgId is int);
+             (data.tgId == null || data.tgId is int) &&
+             (data.referralsCount == null || data.referralsCount is int) &&
+             (data.totalDeposited == null || data.totalDeposited is number) &&
+             (data.totalWithdrawn == null || data.totalWithdrawn is number) &&
+             (data.adsViewed == null || data.adsViewed is int) &&
+             (data.spinsCount == null || data.spinsCount is int) &&
+             (data.promosUsed == null || data.promosUsed is int) &&
+             (data.shopPurchases == null || data.shopPurchases is list);
     }
 
     function isValidGame(data) {
@@ -256,7 +263,9 @@ service cloud.firestore {
                      (request.resource.data.role == 'user' || isAllowedAdmin(request.resource.data));
       allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
                        request.resource.data.uid == resource.data.uid && // UID immutable
-                       request.resource.data.role == resource.data.role) || // Role immutable for users
+                       request.resource.data.role == resource.data.role && // Role immutable
+                       request.resource.data.balance == resource.data.balance && // Balance immutable
+                       request.resource.data.puckBalance == resource.data.puckBalance) || // PuckBalance immutable
                        isAdmin();
     }
 
