@@ -136,35 +136,20 @@ const ProfileFrame = ({ frameId, children, className = "w-full h-full", shape = 
   if (!frame || frameId === 'none') return <div className={`${className} ${radius} overflow-hidden`}>{children}</div>;
   
   return (
-    <div className={`relative ${className} flex items-center justify-center p-[4px]`}>
+    <div className={`relative ${className} flex items-center justify-center p-[1px]`}>
+      {/* Halo Glow */}
       <div 
-        className={`absolute inset-0 ${radius} z-0 ${frame.animate || ''} shadow-2xl overflow-hidden`} 
+        className={`absolute inset-0 ${radius} z-0 ${frame.animate || ''} blur-[2px] opacity-80`} 
         style={{ 
-          background: frame.gradient || 'transparent',
-          border: frame.gradient ? 'none' : `${frame.borderWidth || '4px'} ${frame.borderStyle || 'solid'} ${frame.color}`,
-          boxShadow: frame.shadow || 'none'
+          background: frame.gradient || frame.color,
+          boxShadow: frame.shadow || `0 0 25px ${frame.color}aa`,
         }}
-      >
-        {frame.crypto && (
-          <div className="absolute inset-0 pointer-events-none opacity-40">
-            {[...Array(6)].map((_, i) => (
-              <div 
-                key={i} 
-                className="absolute text-[10px] font-black animate-coin-fall"
-                style={{ 
-                  left: `${Math.random() * 100}%`, 
-                  top: `-${Math.random() * 50}%`,
-                  animationDelay: `${Math.random() * 5}s`,
-                  color: 'white'
-                }}
-              >
-                {frame.crypto}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className={`w-full h-full ${radius} overflow-hidden relative z-10 bg-black/40 backdrop-blur-sm`}>
+      ></div>
+      
+      {/* Inner Frame */}
+      <div className={`absolute inset-[2px] ${radius} z-[1] bg-gradient-to-br from-white/20 to-transparent pointer-events-none`}></div>
+
+      <div className={`w-[calc(100%-6px)] h-[calc(100%-6px)] ${radius} overflow-hidden relative z-10 bg-[#0a0a0a] ring-1 ring-white/10`}>
         {children}
       </div>
     </div>
@@ -522,10 +507,10 @@ const StaticBoard = memo(({ territories, winner }) => {
         <g key={i}>
           <polygon points={t.points} fill={`url(#grad-${i})`} className="transition-all duration-700 ease-in-out" style={{ opacity: (winner && winner.username !== t.username) ? 0.15 : 1 }} />
           <g clipPath={`url(#clip-${i})`}>
-            <foreignObject x={t.avatarPos.x - 7.5} y={t.avatarPos.y - 7.5} width="15" height="15">
+            <foreignObject x={t.avatarPos.x - 15} y={t.avatarPos.y - 15} width="30" height="30">
               <div className="w-full h-full flex items-center justify-center transition-all duration-700 ease-in-out">
                 <ProfileFrame frameId={t.selectedFrame} className="w-full h-full">
-                  <img src={t.avatar} className="w-full h-full rounded-full border-[1.5px] border-black/10 shadow-lg" alt="" referrerPolicy="no-referrer" />
+                  <img src={t.avatar} className="w-full h-full rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
                 </ProfileFrame>
               </div>
             </foreignObject>
@@ -2146,12 +2131,24 @@ const App = () => {
                 
                 {/* VIP Crypto Animation */}
                 {isVIP && (
-                  <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-20">
-                    <div className="absolute inset-0 flex items-center justify-around text-4xl font-black italic select-none animate-crypto-slide">
-                      <span>{frame.crypto}</span>
-                      <span>{frame.crypto}</span>
-                      <span>{frame.crypto}</span>
-                    </div>
+                  <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-40">
+                    {[...Array(6)].map((_, idx) => (
+                      <div 
+                        key={idx}
+                        className="absolute text-3xl font-black italic select-none animate-coin-float"
+                        style={{
+                          left: `${20 + Math.random() * 60}%`,
+                          top: `${10 + Math.random() * 80}%`,
+                          animationDelay: `${idx * 0.7}s`,
+                          animationDuration: `${5 + Math.random() * 4}s`,
+                          color: frame.color,
+                          filter: 'blur(2px)',
+                          opacity: 0.3
+                        }}
+                      >
+                        {frame.crypto}
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -2590,8 +2587,10 @@ const App = () => {
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         @keyframes coinFall { 0% { transform: translateY(-100%) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(500%) rotate(720deg); opacity: 0; } }
+        @keyframes coinFloat { 0%, 100% { transform: translate(0, 0) rotate(0deg); opacity: 0.2; } 50% { transform: translate(10px, -20px) rotate(180deg); opacity: 0.8; } }
         @keyframes cryptoSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         .animate-coin-fall { animation: coinFall linear infinite; }
+        .animate-coin-float { animation: coinFloat ease-in-out infinite; }
         .animate-crypto-slide { animation: cryptoSlide 10s linear infinite; }
       `}</style>
       <SparkleBackground />
