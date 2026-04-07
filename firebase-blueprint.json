@@ -91,11 +91,15 @@
         "reward": { "type": "number" },
         "rewardType": { "type": "string", "enum": ["PUCK", "TON"] },
         "type": { "type": "string", "enum": ["daily", "partner", "achievement"] },
-        "verificationType": { "type": "string", "enum": ["none", "channel", "group", "bot"] },
+        "verificationType": { "type": "string", "enum": ["none", "channel", "group", "bot", "referral", "game", "win", "deposit", "purchase"] },
         "btn": { "type": "string" },
         "link": { "type": "string" },
+        "requiredCount": { "type": "number", "description": "Threshold for achievement tasks (e.g., 5 referrals)." },
+        "color": { "type": "string", "description": "Custom hex color for the task." },
+        "icon": { "type": "string", "description": "Lucide icon name." },
         "completedCount": { "type": "integer" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "deleted": { "type": "boolean" }
       },
       "required": ["id", "title", "reward", "rewardType", "type", "verificationType"]
     },

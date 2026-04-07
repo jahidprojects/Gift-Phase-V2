@@ -490,6 +490,7 @@ const App = () => {
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [allTasks, setAllTasks] = useState([]);
+  const [userData, setUserData] = useState<any>(null);
   const [hasPlayedBefore, setHasPlayedBefore] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('giftphase_played') === 'true';
@@ -513,22 +514,36 @@ const App = () => {
         
         setUser(firebaseUser);
         const userRef = doc(db, 'users', firebaseUser.uid);
+        
+        const userUnsub = onSnapshot(userRef, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            setUserData(data);
+            setMyBalance(data.balance || 0);
+            setPuckBalance(data.puckBalance || 0);
+            setCompletedTaskIds(data.completedTasks || []);
+            const ADMIN_TG_IDS = [6686954447, 1678112785, 5968063026];
+            const isTgAdmin = tgUser && ADMIN_TG_IDS.includes(tgUser.id);
+            setIsAdmin(data.role === 'admin' || firebaseUser.email === 'jahidproject8@gmail.com' || isTgAdmin);
+            
+            // Sync TG ID if missing
+            if (tgUser && !data.tgId) {
+              updateDoc(userRef, { tgId: tgUser.id });
+            }
+          }
+        }, (error) => {
+          handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
+        });
+
         try {
           const userSnap = await getDoc(userRef);
           if (userSnap.exists()) {
-            const userData = userSnap.data();
-            setMyBalance(userData.balance || 0);
-            setPuckBalance(userData.puckBalance || 0);
-            setCompletedTaskIds(userData.completedTasks || []);
-            const ADMIN_TG_IDS = [6686954447, 1678112785, 5968063026];
-            const isTgAdmin = tgUser && ADMIN_TG_IDS.includes(tgUser.id);
-            setIsAdmin(userData.role === 'admin' || firebaseUser.email === 'jahidproject8@gmail.com' || isTgAdmin);
-            
+            const data = userSnap.data();
             // Sync TG name if changed
-            if (tgUser && userData.username !== `@${tgUser.username || tgUser.first_name}`) {
+            if (tgUser && data.username !== `@${tgUser.username || tgUser.first_name}`) {
               updateDoc(userRef, {
                 username: `@${tgUser.username || tgUser.first_name}`,
-                avatar: tgUser.photo_url || userData.avatar
+                avatar: tgUser.photo_url || data.avatar
               });
             }
           } else {
@@ -1448,7 +1463,10 @@ const App = () => {
                     type: taskFilter,
                     verificationType: 'none',
                     link: '',
-                    btn: 'Go'
+                    btn: 'Go',
+                    requiredCount: 0,
+                    color: '',
+                    icon: ''
                   });
                   setIsAddingTask(true);
                 }}
@@ -1558,7 +1576,47 @@ const App = () => {
                       <option value="channel">Telegram Channel</option>
                       <option value="group">Telegram Group</option>
                       <option value="bot">Telegram Bot / MiniApp</option>
+                      <option value="referral">Achievement: Referrals</option>
+                      <option value="game">Achievement: Games Played</option>
+                      <option value="win">Achievement: Wins</option>
+                      <option value="deposit">Achievement: TON Deposited</option>
+                      <option value="purchase">Achievement: Shop Purchases</option>
                     </select>
+                  </div>
+
+                  {['referral', 'game', 'win', 'deposit', 'purchase'].includes(selectedTaskForEdit.verificationType) && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Required Count / Threshold</label>
+                      <input 
+                        type="number" 
+                        value={selectedTaskForEdit.requiredCount || 0}
+                        onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, requiredCount: parseFloat(e.target.value) })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Custom Color (Hex)</label>
+                      <input 
+                        type="text" 
+                        placeholder="#E11D48"
+                        value={selectedTaskForEdit.color || ''}
+                        onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, color: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Icon Name (Lucide)</label>
+                      <input 
+                        type="text" 
+                        placeholder="Send, Gamepad2, etc."
+                        value={selectedTaskForEdit.icon || ''}
+                        onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, icon: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -1582,6 +1640,17 @@ const App = () => {
                       value={selectedTaskForEdit.link}
                       onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, link: e.target.value })}
                       className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-bold text-white focus:outline-none focus:border-rose-400/50"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Button Text</label>
+                    <input 
+                      type="text" 
+                      placeholder="Join, Follow, Play, etc."
+                      value={selectedTaskForEdit.btn || ''}
+                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, btn: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
                     />
                   </div>
                 </div>
@@ -1964,10 +2033,108 @@ const App = () => {
 };
 
   const renderTaskCenter = () => {
+    const [verifyingTaskId, setVerifyingTaskId] = useState(null);
+    const [waitTimer, setWaitTimer] = useState(0);
+
     const tasksToShow = allTasks.filter(t => {
       const cat = taskCategory === 'achievements' ? 'achievement' : taskCategory === 'partners' ? 'partner' : 'daily';
       return t.type === cat && !t.deleted;
     });
+
+    const checkAchievementCriteria = (task) => {
+      if (!userData) return false;
+      const count = task.requiredCount || 0;
+      switch (task.verificationType) {
+        case 'referral': return (userData.referralsCount || 0) >= count;
+        case 'game': return (userData.spinsCount || 0) >= count;
+        case 'win': return (userData.wins || 0) >= count;
+        case 'deposit': return (userData.totalDeposited || 0) >= count;
+        case 'purchase': return (userData.shopPurchases?.length || 0) >= count;
+        default: return false;
+      }
+    };
+
+    const getIcon = (iconName) => {
+      const icons = { Trophy, Zap, Pencil, ArrowUp, Store, Gamepad2, ClipboardList, ChevronLeft, ChevronRight, ChevronDown, MoreVertical, X, Star, Settings, UserPlus, Bolt, Medal, Gift, Wallet, Save, Copy, Share2, History, Link, ArrowDownCircle, ArrowUpCircle, Plus, Globe, Twitter, Youtube, Send, Heart, Users };
+      return icons[iconName] || Bolt;
+    };
+
+    const handleTaskAction = async (task) => {
+      if (completedTaskIds.includes(task.id)) return;
+
+      // Achievement tasks claim automatically if criteria met
+      if (task.type === 'achievement') {
+        if (checkAchievementCriteria(task)) {
+          handleTaskClick(task.id);
+        } else {
+          WebApp.showAlert(`Requirement not met: ${task.requiredCount} needed.`);
+        }
+        return;
+      }
+
+      // Telegram verification tasks (Channel/Group)
+      if (task.verificationType === 'channel' || task.verificationType === 'group') {
+        if (!verifyingTaskId) {
+          if (task.link) WebApp.openTelegramLink(task.link);
+          setVerifyingTaskId(task.id);
+          setWaitTimer(5); // 5s wait before "Check" appears
+          const interval = setInterval(() => {
+            setWaitTimer(prev => {
+              if (prev <= 1) {
+                clearInterval(interval);
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        } else if (verifyingTaskId === task.id && waitTimer === 0) {
+          // Real verification check via backend
+          WebApp.HapticFeedback.impactOccurred('medium');
+          try {
+            const response = await fetch('/api/verify-telegram', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: userData?.tgId, link: task.link })
+            });
+            const data = await response.json();
+            
+            if (data.ok && data.isMember) {
+              handleTaskClick(task.id);
+              setVerifyingTaskId(null);
+              WebApp.HapticFeedback.notificationOccurred('success');
+            } else {
+              WebApp.showAlert(data.error || "Verification failed. Please make sure you have joined the channel/group.");
+              setVerifyingTaskId(null);
+            }
+          } catch (error) {
+            console.error("Verification error:", error);
+            WebApp.showAlert("Verification service unavailable. Try again later.");
+            setVerifyingTaskId(null);
+          }
+        }
+        return;
+      }
+
+      // Other tasks (MiniApp/Link) with 5s wait
+      if (!verifyingTaskId) {
+        if (task.link) WebApp.openLink(task.link);
+        setWaitTimer(5);
+        setVerifyingTaskId(task.id);
+        
+        const interval = setInterval(() => {
+          setWaitTimer(prev => {
+            if (prev <= 1) {
+              clearInterval(interval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else if (verifyingTaskId === task.id && waitTimer === 0) {
+        handleTaskClick(task.id);
+        setVerifyingTaskId(null);
+      }
+    };
 
     return (
       <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10 pt-12">
@@ -2019,14 +2186,34 @@ const App = () => {
         <div className="p-4 space-y-3 relative z-10">
           {tasksToShow.map((task) => {
             const isDone = (completedTaskIds || []).includes(task.id);
+            const isVerifying = verifyingTaskId === task.id;
+            const canClaimAchievement = task.type === 'achievement' && checkAchievementCriteria(task);
+            
+            let themeGrad = 'from-[#0891B2] to-[#2563EB]';
+            if (task.type === 'achievement') themeGrad = 'from-[#7C3AED] to-[#4F46E5]';
+            if (task.type === 'partner') themeGrad = 'from-[#E11D48] to-[#C026D3]';
+            
+            // Override with custom color if provided
+            const customStyle = task.color ? { background: `linear-gradient(to bottom, ${task.color}, ${task.color}dd)` } : {};
+
             let displayIcon = <Bolt size={20} />;
-            if (task.rewardType === 'TON') displayIcon = <Wallet size={20} className="text-rose-400" />;
-            else if (task.verificationType === 'channel') displayIcon = <Send size={20} className="rotate-[-20deg]" />;
+            if (task.icon) {
+              const IconComp = getIcon(task.icon);
+              displayIcon = <IconComp size={20} />;
+            } else {
+              if (task.rewardType === 'TON') displayIcon = <Wallet size={20} className="text-white/80" />;
+              else if (task.verificationType === 'channel') displayIcon = <Send size={20} className="rotate-[-20deg]" />;
+              else if (task.type === 'achievement') displayIcon = <Gamepad2 size={20} />;
+            }
             
             return (
-              <div key={task.id} className={`p-4 rounded-[28px] bg-[#111] border-t border-white/5 shadow-lg flex items-center justify-between transition-all ${isDone ? 'opacity-30' : 'opacity-100'}`}>
+              <div 
+                key={task.id} 
+                className={`p-4 rounded-[28px] bg-gradient-to-b ${themeGrad} border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] flex items-center justify-between transition-all ${isDone ? 'opacity-30' : 'opacity-100'}`}
+                style={customStyle}
+              >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-white">{displayIcon}</div>
+                  <div className="w-10 h-10 rounded-2xl bg-black/20 flex items-center justify-center text-white">{displayIcon}</div>
                   <div className="flex flex-col">
                     <span className="text-white font-black text-[13px] uppercase truncate max-w-[140px]">{task.title}</span>
                     <div className="flex items-center gap-1 text-[11px] font-bold text-white/70">
@@ -2035,20 +2222,36 @@ const App = () => {
                     </div>
                   </div>
                 </div>
-                <button 
-                  onClick={() => {
-                    if (task.link) WebApp.openLink(task.link);
-                    handleTaskClick(task.id);
-                  }}
-                  disabled={isDone}
-                  className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-t ${
-                    isDone 
-                    ? 'bg-transparent text-white/20 border-white/5' 
-                    : `bg-rose-400 text-black border-white/20 shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none`
-                  }`}
-                >
-                  {isDone ? t.completed : task.btn || 'Go'}
-                </button>
+                
+                {task.type === 'achievement' ? (
+                  <button 
+                    onClick={() => handleTaskAction(task)}
+                    disabled={isDone || !canClaimAchievement}
+                    className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-t ${
+                      isDone 
+                      ? 'bg-transparent text-white/20 border-white/5' 
+                      : !canClaimAchievement
+                      ? 'bg-black/20 text-white/20 border-white/5'
+                      : `bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none`
+                    }`}
+                  >
+                    {isDone ? t.completed : canClaimAchievement ? 'Claim' : `${task.requiredCount} Needed`}
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => handleTaskAction(task)}
+                    disabled={isDone}
+                    className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-t ${
+                      isDone 
+                      ? 'bg-transparent text-white/20 border-white/5' 
+                      : isVerifying
+                      ? (waitTimer > 0 ? 'bg-black/20 text-white/40 border-white/5' : 'bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)]')
+                      : `bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none`
+                    }`}
+                  >
+                    {isDone ? t.completed : isVerifying ? (waitTimer > 0 ? `Wait ${waitTimer}s` : (task.verificationType === 'channel' || task.verificationType === 'group' ? 'Check' : 'Claim')) : task.btn || 'Go'}
+                  </button>
+                )}
               </div>
             );
           })}
