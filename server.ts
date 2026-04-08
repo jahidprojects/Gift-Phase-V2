@@ -12,6 +12,19 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Dynamic TON Connect Manifest
+  app.get("/tonconnect-manifest.json", (req, res) => {
+    const host = req.get('host');
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
+    const origin = `${protocol}://${host}`;
+    
+    res.json({
+      url: origin,
+      name: "Gift Phase V2",
+      iconUrl: "https://api.dicebear.com/7.x/identicon/svg?seed=GiftPhase"
+    });
+  });
+
   // Telegram Verification API
   app.post("/api/verify-telegram", async (req, res) => {
     const { userId, link } = req.body;

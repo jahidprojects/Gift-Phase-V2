@@ -11,7 +11,7 @@ service cloud.firestore {
     //   - uid: string (required) - Firebase Auth UID
     //   - username: string (required, < 50 chars) - User's display name
     //   - avatar: string (required, < 500 chars) - URL to profile image
-    //   - balance: number (required, >= 0) - TON balance
+    //   - balance: number (required, >= 0) - DUCK balance
     //   - wins: number (required, >= 0) - Total wins
     //   - volume: number (required, >= 0) - Total volume
     //   - completedTasks: list of strings (required, < 100 items) - Task IDs

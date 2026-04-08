@@ -8,20 +8,23 @@
         "uid": { "type": "string", "description": "Unique user ID from Firebase Auth." },
         "username": { "type": "string", "description": "User's display name or Telegram handle." },
         "avatar": { "type": "string", "description": "URL to the user's profile image." },
-        "balance": { "type": "number", "description": "User's current TON balance." },
+        "balance": { "type": "number", "description": "User's current DUCK balance." },
         "puckBalance": { "type": "number", "description": "User's current PUCK balance." },
         "wins": { "type": "integer", "description": "Total number of games won." },
-        "volume": { "type": "number", "description": "Total TON volume wagered." },
+        "volume": { "type": "number", "description": "Total DUCK volume wagered." },
         "completedTasks": { "type": "array", "items": { "type": "string" }, "description": "List of IDs for completed tasks." },
         "referralCode": { "type": "string", "description": "Unique referral code for the user." },
         "referredBy": { "type": "string", "description": "UID of the user who referred this user." },
         "referralsCount": { "type": "integer", "description": "Number of users referred." },
-        "totalDeposited": { "type": "number", "description": "Total TON deposited." },
-        "totalWithdrawn": { "type": "number", "description": "Total TON withdrawn." },
+        "totalDeposited": { "type": "number", "description": "Total DUCK deposited." },
+        "totalWithdrawn": { "type": "number", "description": "Total DUCK withdrawn." },
         "adsViewed": { "type": "integer", "description": "Total ads viewed." },
         "spinsCount": { "type": "integer", "description": "Total spins performed." },
         "promosUsed": { "type": "integer", "description": "Total promo codes used." },
         "shopPurchases": { "type": "array", "items": { "type": "string" }, "description": "List of shop items purchased." },
+        "selectedFrame": { "type": "string", "description": "ID of the currently selected profile frame." },
+        "unlockedFrames": { "type": "array", "items": { "type": "string" }, "description": "List of frame IDs unlocked by the user." },
+        "walletAddress": { "type": "string", "description": "Connected TON wallet address." },
         "role": { "type": "string", "enum": ["user", "admin"], "description": "User's role for access control." },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -29,7 +32,7 @@
     },
     "Transaction": {
       "title": "Financial Transaction",
-      "description": "Stores TON deposit and withdrawal records.",
+      "description": "Stores DUCK deposit and withdrawal records.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -89,7 +92,7 @@
         "title": { "type": "string" },
         "description": { "type": "string" },
         "reward": { "type": "number" },
-        "rewardType": { "type": "string", "enum": ["PUCK", "TON"] },
+        "rewardType": { "type": "string", "enum": ["PUCK", "DUCK"] },
         "type": { "type": "string", "enum": ["daily", "partner", "achievement"] },
         "verificationType": { "type": "string", "enum": ["none", "channel", "group", "bot", "referral", "game", "win", "deposit", "purchase"] },
         "btn": { "type": "string" },
@@ -105,7 +108,7 @@
     },
     "PromoCode": {
       "title": "Promo Code",
-      "description": "A code users can redeem for TON or PUCK.",
+      "description": "A code users can redeem for DUCK or PUCK.",
       "type": "object",
       "properties": {
         "code": { "type": "string" },
@@ -173,7 +176,7 @@
     },
     "/transactions/{transactionId}": {
       "schema": "Transaction",
-      "description": "TON deposit and withdrawal records."
+      "description": "DUCK deposit and withdrawal records."
     },
     "/winners/{winnerId}": {
       "schema": "Winner",

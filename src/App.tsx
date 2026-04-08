@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, memo, Component } from 'react';
 import WebApp from '@twa-dev/sdk';
-import { TonConnectButton, useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
+import { useTonConnect } from './hooks/useTonConnect';
 import { auth, db } from './firebase';
 import { 
   onAuthStateChanged, 
@@ -100,11 +100,32 @@ const PLAYER_PALETTE = [
   { main: '#4F46E5', light: '#BCC3FF', accent: '#DEE1FF' },
 ];
 
+const DuckIcon = ({ size = 16, className = "" }) => (
+  <div 
+    style={{ width: size, height: size, minWidth: size, minHeight: size }} 
+    className={`inline-flex items-center justify-center bg-gradient-to-b from-[#FFD700] to-[#FFA500] rounded-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.5),0_1px_2px_rgba(0,0,0,0.3)] border border-[#B8860B]/30 shrink-0 ${className}`}
+  >
+    <svg 
+      width={size * 0.7} 
+      height={size * 0.7} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+      className="drop-shadow-[0_1px_0_rgba(0,0,0,0.2)]"
+    >
+      <path 
+        d="M12 2C10.34 2 9 3.34 9 5C9 5.34 9.06 5.67 9.16 5.98C7.28 6.52 6 8.26 6 10.25C6 11.08 6.22 11.85 6.61 12.52C5.08 13.15 4 14.65 4 16.4C4 18.94 6.06 21 8.6 21H15.4C17.94 21 20 18.94 20 16.4C20 14.65 18.92 13.15 17.39 12.52C17.78 11.85 18 11.08 18 10.25C18 8.26 16.72 6.52 14.84 5.98C14.94 5.67 15 5.34 15 5C15 3.34 13.66 2 12 2Z" 
+        fill="white"
+      />
+    </svg>
+  </div>
+);
+
 const PROFILE_FRAMES = [
   { id: 'none', name: 'Default', price: 0, color: 'transparent' },
   { id: 'btc', name: 'Bitcoin VIP', price: 5000000, color: '#F7931A', shadow: '0 0 40px rgba(247, 147, 26, 0.8), inset 0 0 20px rgba(255,255,255,0.4)', crypto: '₿', gradient: 'linear-gradient(135deg, #F7931A, #FFAB40)' },
   { id: 'eth', name: 'Ethereum VIP', price: 4000000, color: '#627EEA', shadow: '0 0 40px rgba(98, 126, 234, 0.8), inset 0 0 20px rgba(255,255,255,0.4)', crypto: 'Ξ', gradient: 'linear-gradient(135deg, #627EEA, #8C8CFF)' },
-  { id: 'ton', name: 'TON VIP', price: 3000000, color: '#0088CC', shadow: '0 0 40px rgba(0, 136, 204, 0.8), inset 0 0 20px rgba(255,255,255,0.4)', crypto: '∇', gradient: 'linear-gradient(135deg, #0088CC, #00AEEF)' },
+  { id: 'duck', name: 'DUCK VIP', price: 3000000, color: '#FFD700', shadow: '0 0 40px rgba(255, 215, 0, 0.8), inset 0 0 20px rgba(255,255,255,0.4)', crypto: '🦆', gradient: 'linear-gradient(135deg, #FFD700, #FFA500)' },
   { id: 'sol', name: 'Solana VIP', price: 2500000, color: '#14F195', shadow: '0 0 40px rgba(20, 241, 149, 0.8), inset 0 0 20px rgba(255,255,255,0.4)', crypto: 'S', gradient: 'linear-gradient(135deg, #14F195, #9945FF)' },
   { id: 'bnb', name: 'Binance VIP', price: 2000000, color: '#F3BA2F', shadow: '0 0 40px rgba(243, 186, 47, 0.8), inset 0 0 20px rgba(255,255,255,0.4)', crypto: 'B', gradient: 'linear-gradient(135deg, #F3BA2F, #FFD700)' },
 ];
@@ -174,8 +195,8 @@ const TRANSLATIONS = {
     connectWallet: 'Connect Wallet',
     deposit: 'Deposit',
     withdrawal: 'Withdrawal',
-    tonBalance: 'TON Balance',
-    inviteFriends: "Invite friends and earn 10% of their spending TON",
+    duckBalance: 'DUCK Balance',
+    inviteFriends: "Invite friends and earn 10% of their spending DUCK",
     copy: 'Copy',
     share: 'Share',
     recentActivity: 'Recent Activity',
@@ -188,7 +209,7 @@ const TRANSLATIONS = {
     achievements: 'Achievements',
     partners: 'Partner',
     leaderboard: 'Leaderboard',
-    top100: 'Top 100 Players by TON Volume',
+    top100: 'Top 100 Players by DUCK Volume',
     wins: 'Wins',
     comingSoon: 'Shop coming soon'
   },
@@ -205,8 +226,8 @@ const TRANSLATIONS = {
     connectWallet: 'Подключить кошелек',
     deposit: 'Депозит',
     withdrawal: 'Вывод',
-    tonBalance: 'Баланс TON',
-    inviteFriends: 'Приглашайте друзей и получайте 10% от их трат TON',
+    duckBalance: 'Баланс DUCK',
+    inviteFriends: 'Приглашайте друзей и получайте 10% от их трат DUCK',
     copy: 'Копировать',
     share: 'Поделиться',
     recentActivity: 'Последние действия',
@@ -219,7 +240,7 @@ const TRANSLATIONS = {
     achievements: 'Достижения',
     partners: 'Партнеры',
     leaderboard: 'Лидерборд',
-    top100: 'Топ 100 игроков по объему TON',
+    top100: 'Топ 100 игроков по объему DUCK',
     wins: 'Побед',
     comingSoon: 'Магазин скоро'
   },
@@ -236,8 +257,8 @@ const TRANSLATIONS = {
     connectWallet: 'اتصال کیف پول',
     deposit: 'واریز',
     withdrawal: 'برداشت',
-    tonBalance: 'موجودی TON',
-    inviteFriends: 'دوستان خود را دعوت کنید و ۱۰٪ از هزینه‌های آن‌ها را دریافت کنید',
+    duckBalance: 'موجودی DUCK',
+    inviteFriends: 'دوستان خود را دعوت کنید و ۱۰٪ از هزینه‌های DUCK آن‌ها را دریافت کنید',
     copy: 'کپی',
     share: 'اشتراک‌گذاری',
     recentActivity: 'فعالیت‌های اخیر',
@@ -250,7 +271,7 @@ const TRANSLATIONS = {
     achievements: 'دستاوردها',
     partners: 'همکاران',
     leaderboard: 'جدول امتیازات',
-    top100: '۱۰۰ بازیکن برتر بر اساس حجم TON',
+    top100: '۱۰۰ بازیکن برتر بر اساس حجم DUCK',
     wins: 'بردها',
     comingSoon: 'فروشگاه به زودی'
   },
@@ -267,8 +288,8 @@ const TRANSLATIONS = {
     connectWallet: 'Wallet verbinden',
     deposit: 'Einzahlung',
     withdrawal: 'Auszahlung',
-    tonBalance: 'TON Guthaben',
-    inviteFriends: 'Freunde einladen und 10% ihrer TON-Ausgaben verdienen',
+    duckBalance: 'DUCK Guthaben',
+    inviteFriends: 'Freunde einladen und 10% ihrer DUCK-Ausgaben verdienen',
     copy: 'Kopieren',
     share: 'Teilen',
     recentActivity: 'Letzte Aktivitäten',
@@ -281,7 +302,7 @@ const TRANSLATIONS = {
     achievements: 'Erfolge',
     partners: 'Partner',
     leaderboard: 'Bestenliste',
-    top100: 'Top 100 Spieler nach TON-Volumen',
+    top100: 'Top 100 Spieler nach DUCK-Volumen',
     wins: 'Siege',
     comingSoon: 'Shop kommt bald'
   }
@@ -301,8 +322,8 @@ const ACHIEVEMENTS = [
   { id: 'a1', title: 'Play 50 PvP Games', goal: 50, current: 50, reward: '100,000', btn: 'Claim' },
   { id: 'a2', title: 'Invite 50 Friends', goal: 50, current: 5, reward: '500,000', btn: 'Claim' },
   { id: 'a3', title: 'Win 50 Games', goal: 50, current: 8, reward: '200,000', btn: 'Claim' },
-  { id: 'a4', title: 'Deposit 1 TON', goal: 1, current: 1, reward: '100,000', btn: 'Claim' },
-  { id: 'a5', title: 'Deposit 5 TON', goal: 5, current: 0, reward: '500,000', btn: 'Claim' },
+  { id: 'a4', title: 'Deposit 1 DUCK', goal: 1, current: 1, reward: '100,000', btn: 'Claim' },
+  { id: 'a5', title: 'Deposit 5 DUCK', goal: 5, current: 0, reward: '500,000', btn: 'Claim' },
   { id: 'a6', title: 'Play 100 Games', goal: 100, current: 12, reward: '250,000', btn: 'Claim' },
   { id: 'a7', title: 'Win 100 Games', goal: 100, current: 8, reward: '500,000', btn: 'Claim' },
 ];
@@ -317,16 +338,16 @@ const PARTNER_TASKS = [
 const LEADERBOARD_DATA = [];
 
 const ACTIVITIES = [
-  { type: 'bid', val: '10.00 ∇', date: '2 mins ago', icon: <Bolt size={16} /> },
+  { type: 'bid', val: <span className="flex items-center gap-1">10.00 <DuckIcon size={14} /></span>, date: '2 mins ago', icon: <Bolt size={16} /> },
   { type: 'invite', val: '@monk joined', date: '1 hour ago', icon: <UserPlus size={16} /> },
-  { type: 'deposit', val: '+50.0 TON', date: 'Yesterday', icon: <ArrowDownCircle size={16} /> },
-  { type: 'withdraw', val: '-20.0 TON', date: '2 days ago', icon: <ArrowUpCircle size={16} /> },
+  { type: 'deposit', val: '+50.0 DUCK', date: 'Yesterday', icon: <ArrowDownCircle size={16} /> },
+  { type: 'withdraw', val: '-20.0 DUCK', date: '2 days ago', icon: <ArrowUpCircle size={16} /> },
 ];
 
 const DEFAULT_AVATAR = "https://api.dicebear.com/7.x/identicon/svg?seed=User";
 
 const PROMO_BANNERS = [
-  { id: 1, title: 'WIN BIG IN ARENA', desc: 'Predict the puck & win TON daily!', grad: 'from-[#0891B2] to-[#2563EB]', icon: <Gamepad2 size={32} /> },
+  { id: 1, title: 'WIN BIG IN ARENA', desc: 'Predict the puck & win DUCK daily!', grad: 'from-[#0891B2] to-[#2563EB]', icon: <Gamepad2 size={32} /> },
   { id: 2, title: 'INVITE & EARN 10%', desc: 'Get rewards for every friend spending.', grad: 'from-[#E11D48] to-[#C026D3]', icon: <UserPlus size={32} /> },
   { id: 3, title: 'PUCK AIRDROP', desc: 'Complete all tasks for 1M PUCK bonus.', grad: 'from-[#7C3AED] to-[#4F46E5]', icon: <Gift size={32} /> },
 ];
@@ -565,8 +586,7 @@ const App = () => {
     return false;
   });
 
-  const [tonConnectUI] = useTonConnectUI();
-  const userAddress = useTonAddress();
+  const { walletAddress, connected, tonConnectUI } = useTonConnect();
 
   // Firebase Auth & Profile Sync with Telegram Identity
   useEffect(() => {
@@ -614,7 +634,7 @@ const App = () => {
               });
             }
           } else {
-            // Create initial profile with 10 TON Bonus
+            // Create initial profile with 10 DUCK Bonus
             const initialData = {
               uid: firebaseUser.uid,
               tgId: tgUser?.id || null,
@@ -639,7 +659,7 @@ const App = () => {
             if (referrerId) {
               const refDoc = doc(db, 'users', referrerId);
               updateDoc(refDoc, {
-                balance: increment(1.0), // 1 TON bonus for referrer
+                balance: increment(1.0), // 1 DUCK bonus for referrer
                 referralsCount: increment(1)
               }).catch(() => {}); // Ignore if referrer doesn't exist
             }
@@ -663,6 +683,15 @@ const App = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  // Sync Wallet Address to Firestore
+  useEffect(() => {
+    if (user && walletAddress) {
+      updateDoc(doc(db, 'users', user.uid), {
+        walletAddress: walletAddress
+      }).catch(err => console.error("Error syncing wallet:", err));
+    }
+  }, [user, walletAddress]);
 
   // Sync Leaderboard
   useEffect(() => {
@@ -1105,7 +1134,7 @@ const App = () => {
   const addBid = async (amt, isMe = false, bot = null) => {
     if (status !== 'waiting' || amt <= 0) return;
     if (isMe && myBalance <= 0) {
-      alert("You need a TON balance greater than 0 to bid!");
+      alert("You need a DUCK balance greater than 0 to bid!");
       return;
     }
     
@@ -1192,7 +1221,7 @@ const App = () => {
         completedTasks: arrayUnion(taskId)
       };
       
-      if (task.rewardType === 'TON') {
+      if (task.rewardType === 'DUCK') {
         setMyBalance(prev => prev + reward);
         updateData.balance = increment(reward);
       } else {
@@ -1374,9 +1403,9 @@ const App = () => {
                           <span className="text-[10px] text-white/30 font-mono">ID: {u.tgId || u.uid} • Rank: {u.wins > 100 ? 'Elite' : u.wins > 50 ? 'Pro' : 'Novice'}</span>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-lg font-black text-rose-400">${(u.balance || 0).toFixed(4)}</div>
-                        <div className="text-[10px] text-white/20 uppercase font-black tracking-widest">profit Tier</div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-lg font-black text-rose-400">{(u.balance || 0).toFixed(4)}</span>
+                        <DuckIcon size={14} />
                       </div>
                     </div>
                   </button>
@@ -1424,7 +1453,7 @@ const App = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Deposit (TON)</label>
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Deposit (DUCK)</label>
                     <input 
                       type="number" 
                       value={selectedUserForEdit.totalDeposited || 0}
@@ -1433,7 +1462,7 @@ const App = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Withdrawal (TON)</label>
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Withdrawal (DUCK)</label>
                     <input 
                       type="number" 
                       value={selectedUserForEdit.totalWithdrawn || 0}
@@ -1454,14 +1483,16 @@ const App = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Balance ($)</label>
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Balance (DUCK)</label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 font-black">$</span>
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                        <DuckIcon size={14} />
+                      </div>
                       <input 
                         type="number" 
                         value={selectedUserForEdit.balance}
                         onChange={(e) => setSelectedUserForEdit({ ...selectedUserForEdit, balance: parseFloat(e.target.value) })}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-8 pr-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
                       />
                     </div>
                   </div>
@@ -1540,7 +1571,7 @@ const App = () => {
                           { id: 'ach_game_2', title: 'Play Arena 5 Matches', description: 'Play 5 matches in the Arena.', reward: 50000, rewardType: 'PUCK', type: 'achievement', verificationType: 'game', requiredCount: 5, color: '#7C3AED', icon: 'Gamepad2', btn: 'Claim' },
                           { id: 'ach_win_1', title: 'Win Arena 1 Match', description: 'Win 1 match in the Arena.', reward: 25000, rewardType: 'PUCK', type: 'achievement', verificationType: 'win', requiredCount: 1, color: '#059669', icon: 'Trophy', btn: 'Claim' },
                           { id: 'ach_win_2', title: 'Win Arena 5 Matches', description: 'Win 5 matches in the Arena.', reward: 150000, rewardType: 'PUCK', type: 'achievement', verificationType: 'win', requiredCount: 5, color: '#059669', icon: 'Trophy', btn: 'Claim' },
-                          { id: 'ach_dep_1', title: 'Deposit 1 TON', description: 'Deposit 1 TON into your balance.', reward: 100000, rewardType: 'PUCK', type: 'achievement', verificationType: 'deposit', requiredCount: 1, color: '#2563EB', icon: 'Wallet', btn: 'Claim' },
+                          { id: 'ach_dep_1', title: 'Deposit 1 DUCK', description: 'Deposit 1 DUCK into your balance.', reward: 100000, rewardType: 'PUCK', type: 'achievement', verificationType: 'deposit', requiredCount: 1, color: '#2563EB', icon: 'Wallet', btn: 'Claim' },
                           { id: 'ach_ref_1', title: 'Invite a friend', description: 'Refer 1 friend to join Gift Phase.', reward: 50000, rewardType: 'PUCK', type: 'achievement', verificationType: 'referral', requiredCount: 1, color: '#E11D48', icon: 'UserPlus', btn: 'Claim' },
                           { id: 'ach_shop_1', title: 'First Purchase in Shop', description: 'Make your first purchase in the Shop.', reward: 50000, rewardType: 'PUCK', type: 'achievement', verificationType: 'purchase', requiredCount: 1, color: '#D97706', icon: 'Store', btn: 'Claim' },
                           { id: 'ach_shop_2', title: '5th Purchase in Shop', description: 'Make 5 purchases in the Shop.', reward: 250000, rewardType: 'PUCK', type: 'achievement', verificationType: 'purchase', requiredCount: 5, color: '#D97706', icon: 'Store', btn: 'Claim' },
@@ -1682,7 +1713,7 @@ const App = () => {
                         className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50 appearance-none"
                       >
                         <option value="PUCK">PUCK</option>
-                        <option value="TON">TON</option>
+                        <option value="DUCK">DUCK</option>
                       </select>
                     </div>
                   </div>
@@ -1701,7 +1732,7 @@ const App = () => {
                       <option value="referral">Achievement: Referrals</option>
                       <option value="game">Achievement: Games Played</option>
                       <option value="win">Achievement: Wins</option>
-                      <option value="deposit">Achievement: TON Deposited</option>
+                      <option value="deposit">Achievement: DUCK Deposited</option>
                       <option value="purchase">Achievement: Shop Purchases</option>
                     </select>
                   </div>
@@ -1826,7 +1857,7 @@ const App = () => {
             <div className="grid grid-cols-2 gap-4">
               {[
                 { label: 'Total Users', value: allUsers.length, color: 'text-white' },
-                { label: 'Total TON', value: allUsers.reduce((acc, u) => acc + (u.balance || 0), 0).toFixed(1), color: 'text-cyan-400' },
+                { label: 'Total DUCK', value: allUsers.reduce((acc, u) => acc + (u.balance || 0), 0).toFixed(1), color: 'text-cyan-400' },
                 { label: 'Total Volume', value: allUsers.reduce((acc, u) => acc + (u.volume || 0), 0).toFixed(0), color: 'text-white' },
                 { label: 'Active Today', value: analytics?.activeToday || 0, color: 'text-green-400' },
                 { label: 'Joined Today', value: analytics?.joinedToday || 0, color: 'text-blue-400' },
@@ -1845,7 +1876,7 @@ const App = () => {
               <button 
                 onClick={() => {
                   const code = prompt("Promo Code:");
-                  const reward = parseFloat(prompt("Reward (TON):") || "0");
+                  const reward = parseFloat(prompt("Reward (DUCK):") || "0");
                   const supply = parseInt(prompt("Supply:") || "0");
                   if (code && reward && supply) {
                     setDoc(doc(db, 'promoCodes', code), { code, reward, supply, claimedBy: [], createdAt: serverTimestamp() });
@@ -1865,7 +1896,7 @@ const App = () => {
                       </div>
                       <div className="flex flex-col">
                         <span className="text-sm font-black text-white">{promo.code}</span>
-                        <span className="text-[10px] text-white/30 uppercase font-black">{promo.reward} TON • {promo.claimedBy?.length || 0}/{promo.supply} Claimed</span>
+                        <span className="text-[10px] text-white/30 uppercase font-black">{promo.reward} DUCK • {promo.claimedBy?.length || 0}/{promo.supply} Claimed</span>
                       </div>
                     </div>
                     <button 
@@ -1940,8 +1971,8 @@ const App = () => {
               <button 
                 onClick={() => {
                   const title = prompt("Offer Title:");
-                  const min = parseFloat(prompt("Min Amount (TON):") || "0");
-                  const max = parseFloat(prompt("Max Amount (TON):") || "0");
+                  const min = parseFloat(prompt("Min Amount (DUCK):") || "0");
+                  const max = parseFloat(prompt("Max Amount (DUCK):") || "0");
                   if (title && min && max) {
                     const id = `off_${Date.now()}`;
                     setDoc(doc(db, 'withdrawalOffers', id), { id, title, minAmount: min, maxAmount: max, createdAt: serverTimestamp() });
@@ -1961,7 +1992,7 @@ const App = () => {
                       </div>
                       <div className="flex flex-col">
                         <span className="text-sm font-black text-white">{offer.title}</span>
-                        <span className="text-[10px] text-white/30 uppercase font-black">{offer.minAmount}-{offer.maxAmount} TON</span>
+                        <span className="text-[10px] text-white/30 uppercase font-black">{offer.minAmount}-{offer.maxAmount} DUCK</span>
                       </div>
                     </div>
                     <button 
@@ -1989,7 +2020,7 @@ const App = () => {
     );
   };
   const handleDeposit = async () => {
-    const amount = parseFloat(prompt("Enter TON amount to deposit:", "10") || "0");
+    const amount = parseFloat(prompt("Enter DUCK amount to deposit:", "10") || "0");
     if (!isNaN(amount) && amount > 0 && user) {
       setMyBalance(prev => prev + amount);
       try {
@@ -2006,7 +2037,7 @@ const App = () => {
           balance: increment(amount),
           totalDeposited: increment(amount)
         });
-        alert(`Successfully deposited ${amount} TON!`);
+        alert(`Successfully deposited ${amount} DUCK!`);
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
       }
@@ -2014,7 +2045,7 @@ const App = () => {
   };
 
   const handleWithdrawal = async () => {
-    const amount = parseFloat(prompt("Enter TON amount to withdraw:", "10") || "0");
+    const amount = parseFloat(prompt("Enter DUCK amount to withdraw:", "10") || "0");
     if (!isNaN(amount) && amount > 0 && user) {
       if (amount <= myBalance) {
         setMyBalance(prev => prev - amount);
@@ -2031,7 +2062,7 @@ const App = () => {
           await updateDoc(doc(db, 'users', user.uid), {
             balance: increment(-amount)
           });
-          alert(`Withdrawal request for ${amount} TON submitted!`);
+          alert(`Withdrawal request for ${amount} DUCK submitted!`);
         } catch (error) {
           handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
         }
@@ -2049,11 +2080,11 @@ const App = () => {
   const handleShare = () => {
     const shareUrl = `t.me/GiftPhaseBot?start=${user?.uid || '6686954447'}`;
     if (typeof window !== 'undefined' && WebApp.initData) {
-      WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent('Join me in Gift Phase V2 and win TON!')}`);
+      WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent('Join me in Gift Phase V2 and win DUCK!')}`);
     } else if (navigator.share) {
       navigator.share({
         title: 'Gift Phase V2',
-        text: 'Join me in Gift Phase V2 and win TON!',
+        text: 'Join me in Gift Phase V2 and win DUCK!',
         url: shareUrl,
       }).catch(console.error);
     } else {
@@ -2107,15 +2138,15 @@ const App = () => {
       <div className="flex justify-between items-center p-4 pt-6 gap-3 shrink-0">
         <div className={`px-3 py-2.5 rounded-full flex-1 flex items-center justify-center gap-1.5 min-w-0 font-sans ${premium3DStyle}`}><span className="text-[14px]">🪙</span><span className="text-[14px] font-black uppercase">{formatCurrency(puckBalance)} PUCK</span></div>
         <div className="bg-black/40 px-3 py-2 rounded-full border border-white/5 flex items-center gap-2 shrink-0 font-sans"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_#22c55e]"></div><span className="text-[11px] font-bold text-gray-300">117 online</span></div>
-        <div className={`px-3 py-2.5 rounded-full flex-1 flex items-center justify-center gap-1 min-w-0 font-sans ${premium3DStyle}`}><span className="text-[14px]">💎</span><span className="text-[14px] font-black uppercase">{myBalance.toFixed(0)} TON</span></div>
+        <div className={`px-3 py-2.5 rounded-full flex-1 flex items-center justify-center gap-2 min-w-0 font-sans ${premium3DStyle}`}><DuckIcon size={18} /><span className="text-[14px] font-black uppercase">{myBalance.toFixed(0)} DUCK</span></div>
       </div>
       <div className="px-4 grid grid-cols-2 gap-3 mb-5 mt-2 shrink-0">
-        <div className={`rounded-2xl p-2.5 flex items-center justify-between border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)]`} style={{ background: `linear-gradient(to bottom, ${topWinner.accentColor}, ${topWinner.color})` }}><div className="flex items-center gap-2 min-w-0"><img src={topWinner.avatar} className="w-6 h-6 rounded-full border border-white/10" referrerPolicy="no-referrer" /><div className="flex flex-col min-w-0"><span className="text-[7px] text-white/60 font-black uppercase">{t.topWin}</span><span className="text-[9px] font-bold text-white truncate">{topWinner.username}</span></div></div><div className="flex flex-col items-end shrink-0 ml-1"><span className="text-[9px] font-black text-white">{topWinner.amount} ∇</span><span className="text-[7px] font-bold text-white/50">{topWinner.winChance}%</span></div></div>
-        <div className={`rounded-2xl p-2.5 flex items-center justify-between border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)]`} style={{ background: `linear-gradient(to bottom, ${lastWinner.accentColor}, ${lastWinner.color})` }}><div className="flex items-center gap-2 min-w-0"><img src={lastWinner.avatar} className="w-6 h-6 rounded-full border border-white/10" referrerPolicy="no-referrer" /><div className="flex flex-col min-w-0"><span className="text-[7px] text-white/60 font-black uppercase">{t.lastWin}</span><span className="text-[9px] font-bold text-white truncate">{lastWinner.username}</span></div></div><div className="flex flex-col items-end shrink-0 ml-1"><span className="text-[9px] font-black text-white">{lastWinner.amount} ∇</span><span className="text-[7px] font-bold text-white/50">{lastWinner.winChance}%</span></div></div>
+        <div className={`rounded-2xl p-2.5 flex items-center justify-between border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)]`} style={{ background: `linear-gradient(to bottom, ${topWinner.accentColor}, ${topWinner.color})` }}><div className="flex items-center gap-2 min-w-0"><img src={topWinner.avatar} className="w-6 h-6 rounded-full border border-white/10" referrerPolicy="no-referrer" /><div className="flex flex-col min-w-0"><span className="text-[7px] text-white/60 font-black uppercase">{t.topWin}</span><span className="text-[9px] font-bold text-white truncate">{topWinner.username}</span></div></div><div className="flex flex-col items-end shrink-0 ml-1"><span className="text-[9px] font-black text-white flex items-center gap-0.5">{topWinner.amount} <DuckIcon size={10} /></span><span className="text-[7px] font-bold text-white/50">{topWinner.winChance}%</span></div></div>
+        <div className={`rounded-2xl p-2.5 flex items-center justify-between border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)]`} style={{ background: `linear-gradient(to bottom, ${lastWinner.accentColor}, ${lastWinner.color})` }}><div className="flex items-center gap-2 min-w-0"><img src={lastWinner.avatar} className="w-6 h-6 rounded-full border border-white/10" referrerPolicy="no-referrer" /><div className="flex flex-col min-w-0"><span className="text-[7px] text-white/60 font-black uppercase">{t.lastWin}</span><span className="text-[9px] font-bold text-white truncate">{lastWinner.username}</span></div></div><div className="flex flex-col items-end shrink-0 ml-1"><span className="text-[9px] font-black text-white flex items-center gap-0.5">{lastWinner.amount} <DuckIcon size={10} /></span><span className="text-[7px] font-bold text-white/50">{lastWinner.winChance}%</span></div></div>
       </div>
-      <div className="px-4 flex justify-between items-end mb-3 px-1 font-sans shrink-0"><div><span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.totalPool}</span><div className="text-cyan-400 font-black text-2xl tracking-tighter">{totalPot.toFixed(2)} ∇</div></div><div className="text-right"><span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.startingIn}</span><div className="font-mono text-2xl font-black">00:{timeLeft.toString().padStart(2, '0')}</div></div></div>
+      <div className="px-4 flex justify-between items-end mb-3 px-1 font-sans shrink-0"><div><span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.totalPool}</span><div className="text-cyan-400 font-black text-2xl tracking-tighter flex items-center gap-1">{totalPot.toFixed(2)} <DuckIcon size={20} /></div></div><div className="text-right"><span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.startingIn}</span><div className="font-mono text-2xl font-black">00:{timeLeft.toString().padStart(2, '0')}</div></div></div>
       <div className="mx-4 relative group shrink-0"><div className="relative aspect-square rounded-[44px] overflow-hidden border-[6px] border-[#1a1a1a] bg-[#111] shadow-2xl mb-6">{players.length === 0 ? <div className="absolute inset-0 flex items-center justify-center text-gray-600 font-black uppercase text-center px-10 italic">{t.waiting}</div> : (<div className={`absolute inset-0 transition-transform duration-[450ms] ease-out ${isZoomed ? 'scale-[2.8]' : 'scale-100'}`} style={{ transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%` }}><StaticBoard territories={territories} winner={winner} /></div>)}<div className={`absolute z-[60] w-14 h-14 transition-opacity duration-300 pointer-events-none flex flex-col items-center justify-center ${status === 'drawing' || status === 'winner' ? 'opacity-100' : 'opacity-0'}`} style={{ left: `${selectorPos.x}%`, top: `${selectorPos.y}%`, transform: 'translate(-50%, -50%)' }}>{status === 'drawing' && hoverInfo.name && (<div key={hoverInfo.name} className={`absolute bg-black/95 backdrop-blur-xl px-4 py-2 rounded-full border border-white/20 flex items-center gap-2.5 shadow-2xl animate-in slide-in-from-bottom-1 fade-in duration-150 transition-all ${selectorPos.y < 25 ? 'top-14 translate-y-2' : '-top-14 -translate-y-2'}`}><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: hoverInfo.color }}></div><span className="text-[6.5px] font-black uppercase tracking-widest text-white">{hoverInfo.name}</span></div>)}{isAiming && <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ transform: `rotate(${selectorAngle}deg)` }}><ArrowUp size={34} className="text-white drop-shadow-[0_0_15px_white] -translate-y-9 animate-pulse" /></div>}<div className="w-full h-full bg-white/20 backdrop-blur-[3.5px] rounded-full border-[3.5px] border-white shadow-[0_0_30px_rgba(255,255,255,0.45)] relative flex items-center justify-center overflow-hidden"><div className="absolute w-full h-[1px] bg-white/40"></div><div className="absolute h-full w-[1px] bg-white/40"></div><div className="relative z-10 w-4 h-4 flex items-center justify-center"><div className="absolute w-4 h-[2.5px] bg-white shadow-[0_0_8px_white] text-transparent">.</div><div className="absolute h-4 w-[2.5px] bg-white shadow-[0_0_8px_white] text-transparent">.</div></div></div></div></div></div>
-      <div className="px-4 w-full flex items-center gap-3 mb-8 mt-2 shrink-0"><button disabled={isBidDisabled} onClick={() => addBid(20, true)} className={`${premium3DStyle} w-14 h-14 rounded-full flex items-center justify-center shrink-0 ${isBidDisabled ? 'opacity-50 grayscale' : ''}`}><Pencil size={24} className="text-white" /></button>{[1, 5, 10].map(v => <button key={v} disabled={isBidDisabled} onClick={() => addBid(v, true)} className={`${premium3DStyle} flex-1 h-14 rounded-[24px] font-black text-lg ${isBidDisabled ? 'opacity-50 grayscale' : ''}`}>{v} <span className="opacity-40 text-xs">∇</span></button>)}<button disabled={isBidDisabled} onClick={() => addBid(myBalance, true)} className={`flex-1 h-14 rounded-[24px] font-black text-[13px] bg-gradient-to-b from-[#2563EB] to-[#1E40AF] border-t border-white/30 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[1px] uppercase transition-all ${isBidDisabled ? 'opacity-50 grayscale' : ''}`}>All-in</button></div>
+      <div className="px-4 w-full flex items-center gap-3 mb-8 mt-2 shrink-0"><button disabled={isBidDisabled} onClick={() => addBid(20, true)} className={`${premium3DStyle} w-14 h-14 rounded-full flex items-center justify-center shrink-0 ${isBidDisabled ? 'opacity-50 grayscale' : ''}`}><Pencil size={24} className="text-white" /></button>{[1, 5, 10].map(v => <button key={v} disabled={isBidDisabled} onClick={() => addBid(v, true)} className={`${premium3DStyle} flex-1 h-14 rounded-[24px] font-black text-lg ${isBidDisabled ? 'opacity-50 grayscale' : ''}`}>{v} <DuckIcon size={14} /></button>)}<button disabled={isBidDisabled} onClick={() => addBid(myBalance, true)} className={`flex-1 h-14 rounded-[24px] font-black text-[13px] bg-gradient-to-b from-[#2563EB] to-[#1E40AF] border-t border-white/30 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[1px] uppercase transition-all ${isBidDisabled ? 'opacity-50 grayscale' : ''}`}>All-in</button></div>
 
       {/* Live Player List */}
       <div className="px-4 mb-12 shrink-0">
@@ -2134,7 +2165,7 @@ const App = () => {
         <div className="space-y-4">
           {players.map((p, i) => {
             const frame = PROFILE_FRAMES.find(f => f.id === p.selectedFrame);
-            const isVIP = ['btc', 'eth', 'ton', 'sol', 'bnb'].includes(p.selectedFrame);
+            const isVIP = ['btc', 'eth', 'duck', 'sol', 'bnb'].includes(p.selectedFrame);
             const isMe = p.uid === user?.uid;
             
             if (isVIP) {
@@ -2192,10 +2223,10 @@ const App = () => {
                     <div className="flex items-center gap-1.5">
                       <span className="text-[18px] font-black text-white tracking-tighter">{p.bet.toFixed(2)}</span>
                       <div className="w-5 h-5 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
-                        <span className="text-[10px] text-white/60">∇</span>
+                        <DuckIcon size={12} />
                       </div>
                     </div>
-                    <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">TON</span>
+                    <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">DUCK</span>
                   </div>
                 </div>
               );
@@ -2217,9 +2248,9 @@ const App = () => {
                 <div className="flex flex-col items-end">
                   <div className="flex items-center gap-1">
                     <span className="text-[14px] font-black text-white tracking-tighter">{p.bet.toFixed(2)}</span>
-                    <span className="text-[10px] font-black text-white/60 uppercase">∇</span>
+                    <DuckIcon size={12} />
                   </div>
-                  <span className="text-[8px] font-bold text-white/40 uppercase">TON</span>
+                  <span className="text-[8px] font-bold text-white/40 uppercase">DUCK</span>
                 </div>
               </div>
             );
@@ -2414,7 +2445,7 @@ const App = () => {
               const IconComp = getIcon(task.icon);
               displayIcon = <IconComp size={20} />;
             } else {
-              if (task.rewardType === 'TON') displayIcon = <Wallet size={20} className="text-white/80" />;
+              if (task.rewardType === 'DUCK') displayIcon = <Wallet size={20} className="text-white/80" />;
               else if (task.type === 'achievement') displayIcon = <Gamepad2 size={20} />;
             }
             
@@ -2516,9 +2547,9 @@ const App = () => {
                 <div className="flex flex-col items-end">
                   <div className="flex items-center gap-1">
                     <span className="text-[14px] font-black text-white tracking-tighter">{player.volume?.toFixed(2)}</span>
-                    <span className="text-[10px] font-black text-white/60 uppercase">∇</span>
+                    <DuckIcon size={12} />
                   </div>
-                  <span className="text-[8px] font-bold text-white/40 uppercase">TON</span>
+                  <span className="text-[8px] font-bold text-white/40 uppercase">DUCK</span>
                 </div>
               </div>
             ); 
@@ -2575,16 +2606,26 @@ const App = () => {
               <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,#ffffff_1px,transparent_1px)] bg-[length:15px_15px]"></div>
               <div className="flex flex-col items-center relative z-10 w-full py-2">
                 <div className="mb-6 scale-110">
-                  <TonConnectButton />
+                  <button 
+                    onClick={() => tonConnectUI.openModal()}
+                    className={`px-8 py-3 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg active:translate-y-[2px] ${connected ? 'bg-white/10 text-white border border-white/20' : 'bg-white text-black hover:bg-white/90'}`}
+                  >
+                    {connected ? (
+                      <div className="flex items-center gap-2">
+                        <Wallet size={18} />
+                        {walletAddress?.slice(0, 4)}...{walletAddress?.slice(-4)}
+                      </div>
+                    ) : (
+                      'Connect Wallet'
+                    )}
+                  </button>
                 </div>
-                {userAddress && (
+                {connected && (
                   <>
-                    <span className="text-white/50 text-[11px] font-black uppercase tracking-widest mb-1">{t.tonBalance}</span>
+                    <span className="text-white/50 text-[11px] font-black uppercase tracking-widest mb-1">{t.duckBalance}</span>
                     <div className="flex items-center gap-2 mb-8">
                       <span className="text-4xl font-black text-white leading-none">{myBalance.toFixed(2)}</span>
-                      <div className="w-8 h-8 rounded-full bg-cyan-400 flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.4)]">
-                        <span className="text-[14px]">💎</span>
-                      </div>
+                      <DuckIcon size={32} />
                     </div>
                     <div className="flex gap-4 w-full px-4">
                       <button onClick={handleDeposit} className={`flex-1 py-3.5 rounded-2xl ${white3DStyle}`}>{t.deposit}</button>
@@ -2737,7 +2778,7 @@ const App = () => {
               {[
                 { id: 'pack_bnb', frameId: 'bnb', name: 'BNB SPECIAL', pucks: 100000, price: 1, color: '#F3BA2F' },
                 { id: 'pack_sol', frameId: 'sol', name: 'SOLANA ELITE', pucks: 300000, price: 3, color: '#14F195' },
-                { id: 'pack_ton', frameId: 'ton', name: 'TON PREMIUM', pucks: 500000, price: 5, color: '#0088CC' },
+                { id: 'pack_duck', frameId: 'duck', name: 'DUCK PREMIUM', pucks: 500000, price: 5, color: '#FFD700' },
                 { id: 'pack_eth', frameId: 'eth', name: 'ETH LEGEND', pucks: 1000000, price: 7, color: '#627EEA' },
                 { id: 'pack_btc', frameId: 'btc', name: 'BTC MYTHIC', pucks: 2000000, price: 10, color: '#F7931A' },
               ].map(pack => (
@@ -2772,7 +2813,7 @@ const App = () => {
                         onClick={async () => {
                           if (!user) return;
                           if (myBalance < pack.price) {
-                            alert("Insufficient TON balance!");
+                            alert("Insufficient DUCK balance!");
                             return;
                           }
                           
@@ -2793,8 +2834,8 @@ const App = () => {
                         }}
                         className={`w-full py-2.5 rounded-xl flex items-center justify-center gap-1.5 ${white3DStyle}`}
                       >
-                        <span className="text-[14px]">💎</span>
-                        <span className="text-sm uppercase">{pack.price.toFixed(2)} TON</span>
+                        <DuckIcon size={18} />
+                        <span className="text-sm uppercase">{pack.price.toFixed(2)} DUCK</span>
                       </button>
                       <span className="text-[9px] font-black text-white/90 mt-2 bg-black/20 px-2 py-0.5 rounded-full border border-white/10">+{pack.pucks.toLocaleString()} PUCK</span>
                     </div>
@@ -2826,8 +2867,8 @@ const App = () => {
               <div className="absolute top-8 right-8 z-10"><button onClick={() => resetGame()} className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center relative active:scale-90 transition-transform"><svg className="absolute inset-0 w-full h-full -rotate-90"><circle cx="24" cy="24" r="22" stroke="white" strokeWidth="3" fill="none" strokeOpacity="0.1" /><circle cx="24" cy="24" r="22" stroke="white" strokeWidth="3" fill="none" strokeDasharray={138.2} strokeDashoffset={138.2 - (popupTimeLeft / 5) * 138.2} className="transition-all duration-50" /></svg><X size={20} className="text-white relative z-10" /></button></div>
               <div className="text-center mb-4 mt-2"><h2 className="text-3xl font-black text-white uppercase">{persistentWinner?.username || 'Player'} won</h2></div>
               <div className="relative h-44 w-full flex items-center justify-center mb-4"><div className="absolute w-40 h-40 bg-gradient-radial from-[#2563EB]/40 via-[#4F46E5]/20 to-transparent blur-3xl animate-pulse"></div><div className="relative animate-bounce"><div className="relative"><Trophy size={90} className="text-yellow-400 drop-shadow-[0_0_40px_rgba(250,204,21,0.8)]" /><div className="absolute -top-6 -right-6 animate-spin-slow"><Star size={40} fill="#FACC15" className="text-yellow-400" /></div></div></div></div>
-              <div className="flex items-center gap-3 mb-4 w-full justify-center"><div className="bg-[#1a1a1a] px-10 py-5 rounded-[28px] border border-white/5 shadow-inner flex flex-col items-center min-w-[200px]"><span className="text-3xl font-black text-white">{persistentWinner?.totalPrize?.toFixed(2) || '0.00'} TON</span><span className="text-[10px] text-white/30 uppercase font-bold mt-1">Total Prize</span></div><div className="bg-[#2563EB] px-6 py-5 rounded-[24px] border-t border-white/30 shadow-xl flex flex-col items-center"><span className="text-lg font-black text-white italic">{(persistentWinner?.totalPrize && persistentWinner?.bet) ? (persistentWinner.totalPrize / persistentWinner.bet).toFixed(2) : '1.00'}x</span><span className="text-[10px] text-white/50 uppercase font-bold mt-1">ROI</span></div></div>
-              <div className="grid grid-cols-2 gap-4 w-full px-2"><div className="p-5 rounded-[32px] border-t border-white/15 shadow-xl flex flex-col items-center gap-2" style={{ background: `linear-gradient(to bottom, ${PLAYER_PALETTE[2].accent}, ${PLAYER_PALETTE[2].main})` }}><Trophy size={28} className="text-white/60" /><span className="text-sm font-black text-white">{(persistentWinner?.bet || 0).toFixed(2)} ∇</span><span className="text-[9px] text-white/50 uppercase font-bold">Winner's Bid</span></div><div className="p-5 rounded-[32px] border-t border-white/15 shadow-xl flex flex-col items-center gap-2" style={{ background: `linear-gradient(to bottom, #A5C9FF, #2563EB)` }}><Zap size={28} className="text-white/60" /><span className="text-sm font-black text-white">{(persistentWinner?.bet && persistentWinner?.totalPrize) ? ((persistentWinner.bet/persistentWinner.totalPrize)*100).toFixed(1) : '0.0'}%</span><span className="text-[9px] text-white/50 uppercase font-bold">Win Chance</span></div></div>
+              <div className="flex items-center gap-3 mb-4 w-full justify-center"><div className="bg-[#1a1a1a] px-10 py-5 rounded-[28px] border border-white/5 shadow-inner flex flex-col items-center min-w-[200px]"><span className="text-3xl font-black text-white flex items-center gap-2">{persistentWinner?.totalPrize?.toFixed(2) || '0.00'} <DuckIcon size={24} /></span><span className="text-[10px] text-white/30 uppercase font-bold mt-1">Total Prize</span></div><div className="bg-[#2563EB] px-6 py-5 rounded-[24px] border-t border-white/30 shadow-xl flex flex-col items-center"><span className="text-lg font-black text-white italic">{(persistentWinner?.totalPrize && persistentWinner?.bet) ? (persistentWinner.totalPrize / persistentWinner.bet).toFixed(2) : '1.00'}x</span><span className="text-[10px] text-white/50 uppercase font-bold mt-1">ROI</span></div></div>
+              <div className="grid grid-cols-2 gap-4 w-full px-2"><div className="p-5 rounded-[32px] border-t border-white/15 shadow-xl flex flex-col items-center gap-2" style={{ background: `linear-gradient(to bottom, ${PLAYER_PALETTE[2].accent}, ${PLAYER_PALETTE[2].main})` }}><Trophy size={28} className="text-white/60" /><span className="text-sm font-black text-white flex items-center gap-1">{(persistentWinner?.bet || 0).toFixed(2)} <DuckIcon size={14} /></span><span className="text-[9px] text-white/50 uppercase font-bold">Winner's Bid</span></div><div className="p-5 rounded-[32px] border-t border-white/15 shadow-xl flex flex-col items-center gap-2" style={{ background: `linear-gradient(to bottom, #A5C9FF, #2563EB)` }}><Zap size={28} className="text-white/60" /><span className="text-sm font-black text-white">{(persistentWinner?.bet && persistentWinner?.totalPrize) ? ((persistentWinner.bet/persistentWinner.totalPrize)*100).toFixed(1) : '0.0'}%</span><span className="text-[9px] text-white/50 uppercase font-bold">Win Chance</span></div></div>
            </div>
         </div>
       )}

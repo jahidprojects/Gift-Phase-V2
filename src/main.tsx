@@ -6,7 +6,7 @@ import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <TonConnectUIProvider manifestUrl="https://ais-dev-vogitor5wiwoqga4fthhyj-112607555481.europe-west2.run.app/tonconnect-manifest.json">
+    <TonConnectUIProvider manifestUrl="/tonconnect-manifest.json">
       <App />
     </TonConnectUIProvider>
   </StrictMode>,
