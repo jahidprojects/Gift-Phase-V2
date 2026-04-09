@@ -558,6 +558,788 @@ const StaticBoard = memo(({ territories, winner }) => {
   );
 });
 
+const formatCurrency = (val) => {
+  if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+  if (val >= 1000) return (val / 1000).toFixed(1) + 'K';
+  return val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+};
+
+const formatCurrencySimple = (val) => {
+  if (val >= 1000000) return (val / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (val >= 1000) return (val / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+};
+
+const AdminPanel = ({ 
+  isAdmin, 
+  user, 
+  allTasks, 
+  setIsAdminPanelOpen, 
+  t,
+  DuckIcon,
+  TonIcon
+}: { 
+  isAdmin: boolean, 
+  user: FirebaseUser | null, 
+  allTasks: any[], 
+  setIsAdminPanelOpen: (open: boolean) => void,
+  t: any,
+  DuckIcon: any,
+  TonIcon: any
+}) => {
+  const [allUsers, setAllUsers] = useState([]);
+  const [allTransactions, setAllTransactions] = useState([]);
+  const [allPromoCodes, setAllPromoCodes] = useState([]);
+  const [allReferralLinks, setAllReferralLinks] = useState([]);
+  const [allWithdrawalOffers, setAllWithdrawalOffers] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [adminTab, setAdminTab] = useState('users');
+  const [taskFilter, setTaskFilter] = useState('daily');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState(null);
+  const [selectedTaskForEdit, setSelectedTaskForEdit] = useState(null);
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [isAddingPromo, setIsAddingPromo] = useState(false);
+  const [isAddingReferral, setIsAddingReferral] = useState(false);
+  const [isAddingWithdrawal, setIsAddingWithdrawal] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin || !user) return;
+    
+    const usersUnsub = onSnapshot(collection(db, 'users'), (snap) => {
+      setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'users');
+    });
+
+    const transUnsub = onSnapshot(query(collection(db, 'transactions'), orderBy('createdAt', 'desc'), limit(50)), (snap) => {
+      setAllTransactions(snap.docs.map(d => d.data()));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'transactions');
+    });
+
+    const promoUnsub = onSnapshot(collection(db, 'promoCodes'), (snap) => {
+      setAllPromoCodes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const referralUnsub = onSnapshot(collection(db, 'referralLinks'), (snap) => {
+      setAllReferralLinks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const withdrawalUnsub = onSnapshot(collection(db, 'withdrawalOffers'), (snap) => {
+      setAllWithdrawalOffers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const analyticsUnsub = onSnapshot(doc(db, 'analytics', 'global'), (snap) => {
+      if (snap.exists()) setAnalytics(snap.data());
+    });
+
+    return () => { 
+      usersUnsub(); 
+      transUnsub(); 
+      promoUnsub(); 
+      referralUnsub(); 
+      withdrawalUnsub(); 
+      analyticsUnsub();
+    };
+  }, [isAdmin, user]);
+
+  const filteredUsers = allUsers.filter(u => 
+    u.username?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    u.uid?.includes(searchQuery) ||
+    u.tgId?.toString().includes(searchQuery)
+  );
+
+  return (
+    <div className="fixed inset-0 z-[500] bg-black/95 backdrop-blur-xl flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-cyan-400/20 flex items-center justify-center">
+            <Settings className="text-cyan-400" size={24} />
+          </div>
+          <div>
+            <h2 className="text-xl font-black uppercase italic text-white">Admin Panel</h2>
+            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">System Control Center</p>
+          </div>
+        </div>
+        <button onClick={() => setIsAdminPanelOpen(false)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+          <X size={20} />
+        </button>
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="flex overflow-x-auto no-scrollbar border-b border-white/10 shrink-0 bg-white/5">
+        {[
+          { id: 'users', icon: <Users size={18} />, label: 'Users' },
+          { id: 'daily_tasks', icon: <CheckSquare size={18} />, label: 'Daily' },
+          { id: 'achievement_tasks', icon: <Trophy size={18} />, label: 'Achievements' },
+          { id: 'partner_tasks', icon: <Users size={18} />, label: 'Partners' },
+          { id: 'promo', icon: <Gift size={18} />, label: 'Promo' },
+          { id: 'referral', icon: <Link size={18} />, label: 'Referral' },
+          { id: 'analytics', icon: <BarChart2 size={18} />, label: 'Stats' },
+          { id: 'withdrawal', icon: <Coins size={18} />, label: 'Offers' },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setAdminTab(tab.id)}
+            className={`flex items-center gap-2 px-6 py-4 border-b-2 transition-all shrink-0 ${
+              adminTab === tab.id 
+              ? 'border-cyan-400 text-cyan-400 bg-cyan-400/5' 
+              : 'border-transparent text-white/40 hover:text-white/60'
+            }`}
+          >
+            {tab.icon}
+            <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto no-scrollbar p-6">
+        {adminTab === 'users' && (
+          <div className="space-y-6">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Search by username or UID..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:outline-none focus:border-cyan-400/50 transition-all"
+                />
+              </div>
+              <button 
+                className="px-8 bg-rose-400 text-black font-black uppercase rounded-full shadow-lg active:translate-y-1 transition-all"
+                onClick={() => {/* Search is already filtered by state, but this button matches the UI */}}
+              >
+                Search
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              {filteredUsers.map((u, i) => (
+                <button 
+                  key={i} 
+                  onClick={() => setSelectedUserForEdit(u)}
+                  className="p-4 bg-white/5 rounded-[24px] border border-white/5 flex flex-col gap-4 text-left hover:bg-white/10 transition-all active:scale-[0.98]"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img src={u.avatar} className="w-12 h-12 rounded-full border border-white/10" referrerPolicy="no-referrer" />
+                      <div className="flex flex-col">
+                        <span className="text-base font-black text-white">{u.username}</span>
+                        <span className="text-[10px] text-white/30 font-mono">ID: {u.tgId || u.uid} • Rank: {u.wins > 100 ? 'Elite' : u.wins > 50 ? 'Pro' : 'Novice'}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-lg font-black text-rose-400">{(u.balance || 0).toFixed(4)}</span>
+                      <DuckIcon size={14} />
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Manage User Modal */}
+        {selectedUserForEdit && (
+          <div className="fixed inset-0 z-[600] bg-black/80 backdrop-blur-sm flex items-end justify-center p-4">
+            <div className="w-full max-w-md bg-[#0a0a0a] rounded-[40px] border border-white/10 p-8 space-y-8 animate-in slide-in-from-bottom duration-300">
+              <div className="flex justify-between items-center">
+                <h3 className="text-2xl font-black text-white">Manage User</h3>
+                <button onClick={() => setSelectedUserForEdit(null)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 rounded-full border-2 border-rose-400/50 p-1">
+                  <img src={selectedUserForEdit.avatar} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-2xl font-black text-white">{selectedUserForEdit.username}</span>
+                  <span className="text-sm font-bold text-white/30">{selectedUserForEdit.tgId || selectedUserForEdit.uid} ({selectedUserForEdit.username})</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Ads Viewed', value: selectedUserForEdit.adsViewed || 0, color: 'text-rose-400' },
+                  { label: 'Refers', value: selectedUserForEdit.referralsCount || 0, color: 'text-rose-400' },
+                  { label: 'Spins', value: selectedUserForEdit.spinsCount || 0, color: 'text-rose-400' },
+                  { label: 'Promos Used', value: selectedUserForEdit.promosUsed || 0, color: 'text-rose-400' },
+                  { label: 'Tasks Done', value: selectedUserForEdit.completedTasks?.length || 0, color: 'text-rose-400' },
+                  { label: 'Withdrawals', value: selectedUserForEdit.withdrawalsCount || 0, color: 'text-rose-400' },
+                ].map((stat, i) => (
+                  <div key={i} className="bg-white/5 p-4 rounded-2xl border border-white/5 text-center flex flex-col gap-1">
+                    <span className="text-[9px] font-black text-white/30 uppercase tracking-widest leading-tight">{stat.label}</span>
+                    <span className={`text-lg font-black ${stat.color}`}>{stat.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Deposit (DUCK)</label>
+                  <input 
+                    type="number" 
+                    value={selectedUserForEdit.totalDeposited || 0}
+                    onChange={(e) => setSelectedUserForEdit({ ...selectedUserForEdit, totalDeposited: parseFloat(e.target.value) })}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Withdrawal (DUCK)</label>
+                  <input 
+                    type="number" 
+                    value={selectedUserForEdit.totalWithdrawn || 0}
+                    onChange={(e) => setSelectedUserForEdit({ ...selectedUserForEdit, totalWithdrawn: parseFloat(e.target.value) })}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Referrals</label>
+                  <input 
+                    type="number" 
+                    value={selectedUserForEdit.referralsCount || 0}
+                    onChange={(e) => setSelectedUserForEdit({ ...selectedUserForEdit, referralsCount: parseInt(e.target.value) })}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Balance (DUCK)</label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                      <DuckIcon size={14} />
+                    </div>
+                    <input 
+                      type="number" 
+                      value={selectedUserForEdit.balance}
+                      onChange={(e) => setSelectedUserForEdit({ ...selectedUserForEdit, balance: parseFloat(e.target.value) })}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Puck Balance</label>
+                  <input 
+                    type="number" 
+                    value={selectedUserForEdit.tonBalance}
+                    onChange={(e) => setSelectedUserForEdit({ ...selectedUserForEdit, tonBalance: parseInt(e.target.value) })}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Tier</label>
+                  <div className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white flex items-center justify-center">
+                    {selectedUserForEdit.wins > 100 ? 'Elite' : selectedUserForEdit.wins > 50 ? 'Pro' : 'Novice'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Shop Purchases</label>
+                <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 min-h-[60px] flex flex-wrap gap-2">
+                  {selectedUserForEdit.shopPurchases?.length > 0 ? (
+                    selectedUserForEdit.shopPurchases.map((item, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-rose-400/10 text-rose-400 text-[10px] font-black uppercase rounded-lg border border-rose-400/20">
+                        {item}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[10px] font-black text-white/20 uppercase">No purchases yet</span>
+                  )}
+                </div>
+              </div>
+
+              <button 
+                onClick={async () => {
+                  try {
+                    await updateDoc(doc(db, 'users', selectedUserForEdit.uid), {
+                      balance: selectedUserForEdit.balance,
+                      tonBalance: selectedUserForEdit.tonBalance,
+                      totalDeposited: selectedUserForEdit.totalDeposited || 0,
+                      totalWithdrawn: selectedUserForEdit.totalWithdrawn || 0,
+                      referralsCount: selectedUserForEdit.referralsCount || 0
+                    });
+                    setSelectedUserForEdit(null);
+                    WebApp.HapticFeedback.notificationOccurred('success');
+                  } catch (error) {
+                    console.error("Error updating user:", error);
+                    alert("Failed to update user.");
+                  }
+                }}
+                className="w-full py-6 bg-rose-400 text-black font-black uppercase rounded-[32px] flex items-center justify-center gap-2 shadow-lg active:translate-y-1 transition-all"
+              >
+                <Bolt size={20} /> Save Changes
+              </button>
+            </div>
+          </div>
+        )}
+
+        {['daily_tasks', 'achievement_tasks', 'partner_tasks'].includes(adminTab) && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-black text-white uppercase italic">
+                {adminTab === 'daily_tasks' ? 'Daily Tasks' : adminTab === 'achievement_tasks' ? 'Achievement Tasks' : 'Partner Tasks'}
+              </h3>
+              {adminTab === 'achievement_tasks' && (
+                <button 
+                  onClick={async () => {
+                    if (confirm("This will add 20 achievement tasks. Continue?")) {
+                      const tasks = [
+                        { id: 'ach_game_1', title: 'Play Arena 1 Match', description: 'Play 1 match in the Arena.', reward: 10000, rewardType: 'TON', type: 'achievement', verificationType: 'game', requiredCount: 1, color: '#7C3AED', icon: 'Gamepad2', btn: 'Claim' },
+                        { id: 'ach_game_2', title: 'Play Arena 5 Matches', description: 'Play 5 matches in the Arena.', reward: 50000, rewardType: 'TON', type: 'achievement', verificationType: 'game', requiredCount: 5, color: '#7C3AED', icon: 'Gamepad2', btn: 'Claim' },
+                        { id: 'ach_win_1', title: 'Win Arena 1 Match', description: 'Win 1 match in the Arena.', reward: 25000, rewardType: 'TON', type: 'achievement', verificationType: 'win', requiredCount: 1, color: '#059669', icon: 'Trophy', btn: 'Claim' },
+                        { id: 'ach_win_2', title: 'Win Arena 5 Matches', description: 'Win 5 matches in the Arena.', reward: 150000, rewardType: 'TON', type: 'achievement', verificationType: 'win', requiredCount: 5, color: '#059669', icon: 'Trophy', btn: 'Claim' },
+                        { id: 'ach_dep_1', title: 'Deposit 1 DUCK', description: 'Deposit 1 DUCK into your balance.', reward: 100000, rewardType: 'TON', type: 'achievement', verificationType: 'deposit', requiredCount: 1, color: '#2563EB', icon: 'Wallet', btn: 'Claim' },
+                        { id: 'ach_ref_1', title: 'Invite a friend', description: 'Refer 1 friend to join Gift Phase.', reward: 50000, rewardType: 'TON', type: 'achievement', verificationType: 'referral', requiredCount: 1, color: '#E11D48', icon: 'UserPlus', btn: 'Claim' },
+                        { id: 'ach_shop_1', title: 'First Purchase in Shop', description: 'Make your first purchase in the Shop.', reward: 50000, rewardType: 'TON', type: 'achievement', verificationType: 'purchase', requiredCount: 1, color: '#D97706', icon: 'Store', btn: 'Claim' },
+                        { id: 'ach_shop_2', title: '5th Purchase in Shop', description: 'Make 5 purchases in the Shop.', reward: 250000, rewardType: 'TON', type: 'achievement', verificationType: 'purchase', requiredCount: 5, color: '#D97706', icon: 'Store', btn: 'Claim' },
+                      ];
+                      try {
+                        for (const t of tasks) {
+                          await setDoc(doc(db, 'tasks', t.id), { ...t, createdAt: serverTimestamp() }, { merge: true });
+                        }
+                        WebApp.HapticFeedback.notificationOccurred('success');
+                        alert("20 Achievement tasks seeded successfully!");
+                      } catch (e) { console.error(e); }
+                    }
+                  }}
+                  className="px-4 py-2 bg-white/10 text-white/60 text-[10px] font-black uppercase rounded-lg border border-white/10 hover:bg-white/20 transition-all"
+                >
+                  Seed Tasks
+                </button>
+              )}
+            </div>
+
+            <button 
+              onClick={() => {
+                const currentCat = adminTab === 'daily_tasks' ? 'daily' : adminTab === 'achievement_tasks' ? 'achievement' : 'partner';
+                setSelectedTaskForEdit({
+                  id: `task_${Date.now()}`,
+                  title: '',
+                  description: '',
+                  reward: 0,
+                  rewardType: 'TON',
+                  type: currentCat,
+                  verificationType: 'none',
+                  link: '',
+                  btn: 'Go',
+                  requiredCount: 0,
+                  color: '',
+                  icon: ''
+                });
+                setIsAddingTask(true);
+              }}
+              className="w-full py-5 bg-rose-400 text-black font-black uppercase rounded-[24px] flex items-center justify-center gap-2 shadow-lg active:translate-y-1 transition-all"
+            >
+              <Plus size={20} /> Add New {adminTab === 'daily_tasks' ? 'Daily' : adminTab === 'achievement_tasks' ? 'Achievement' : 'Partner'} Task
+            </button>
+
+            <div className="space-y-3">
+              {allTasks.filter(t => {
+                const currentCat = adminTab === 'daily_tasks' ? 'daily' : adminTab === 'achievement_tasks' ? 'achievement' : 'partner';
+                return t.type === currentCat && !t.deleted;
+              }).map(task => (
+                <button 
+                  key={task.id} 
+                  onClick={() => {
+                    setSelectedTaskForEdit(task);
+                    setIsAddingTask(false);
+                  }}
+                  className="w-full p-5 bg-white/5 rounded-[24px] border border-white/5 flex items-center justify-between hover:bg-white/10 transition-all text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/5">
+                      {(() => {
+                        const title = (task.title || '').toLowerCase();
+                        const link = (task.link || '').toLowerCase();
+                        if (title.includes('deposit')) return <Wallet size={24} className="text-rose-400" />;
+                        if (link.includes('t.me')) {
+                          if (link.includes('bot')) return <Gamepad2 size={24} className="text-rose-400" />;
+                          return <Send size={24} className="text-rose-400 rotate-[-20deg]" />;
+                        }
+                        return <CheckSquare size={24} className="text-rose-400" />;
+                      })()}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-base font-black text-white">{task.title}</span>
+                      <span className="text-[10px] text-white/30 uppercase font-black tracking-widest">
+                        {task.verificationType} • {task.reward} {task.rewardType}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-sm font-black text-rose-400">{task.completedCount || 0}</div>
+                      <div className="text-[8px] text-white/20 uppercase font-black">Claims</div>
+                    </div>
+                    <ChevronRight size={20} className="text-white/20" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Manage Task Modal */}
+        {selectedTaskForEdit && (
+          <div className="fixed inset-0 z-[600] bg-black/80 backdrop-blur-sm flex items-end justify-center p-4">
+            <div className="w-full max-w-md bg-[#0a0a0a] rounded-[40px] border border-white/10 p-8 space-y-6 animate-in slide-in-from-bottom duration-300 overflow-y-auto max-h-[90vh] no-scrollbar">
+              <div className="flex justify-between items-center">
+                <h3 className="text-2xl font-black text-white">{isAddingTask ? 'Add New Task' : 'Manage Task'}</h3>
+                <button onClick={() => setSelectedTaskForEdit(null)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Title</label>
+                  <input 
+                    type="text" 
+                    placeholder="Display Title"
+                    value={selectedTaskForEdit.title}
+                    onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, title: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Description</label>
+                  <textarea 
+                    placeholder="Task description..."
+                    value={selectedTaskForEdit.description}
+                    onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, description: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-bold text-white focus:outline-none focus:border-rose-400/50 min-h-[100px] resize-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Reward Amount</label>
+                    <input 
+                      type="number" 
+                      value={selectedTaskForEdit.reward}
+                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, reward: parseFloat(e.target.value) })}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Reward Type</label>
+                    <select 
+                      value={selectedTaskForEdit.rewardType}
+                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, rewardType: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50 appearance-none"
+                    >
+                      <option value="TON">TON</option>
+                      <option value="DUCK">DUCK</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Task Configuration (Verification)</label>
+                  <select 
+                    value={selectedTaskForEdit.verificationType}
+                    onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, verificationType: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50 appearance-none"
+                  >
+                    <option value="none">No verification needed / Generic</option>
+                    <option value="channel">Telegram Channel</option>
+                    <option value="group">Telegram Group</option>
+                    <option value="bot">Telegram Bot / MiniApp</option>
+                    <option value="referral">Achievement: Referrals</option>
+                    <option value="game">Achievement: Games Played</option>
+                    <option value="win">Achievement: Wins</option>
+                    <option value="deposit">Achievement: DUCK Deposited</option>
+                    <option value="purchase">Achievement: Shop Purchases</option>
+                  </select>
+                </div>
+
+                {['referral', 'game', 'win', 'deposit', 'purchase'].includes(selectedTaskForEdit.verificationType) && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Required Count / Threshold</label>
+                    <input 
+                      type="number" 
+                      value={selectedTaskForEdit.requiredCount || 0}
+                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, requiredCount: parseFloat(e.target.value) })}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Custom Color (Hex)</label>
+                    <input 
+                      type="text" 
+                      placeholder="#E11D48"
+                      value={selectedTaskForEdit.color || ''}
+                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, color: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Icon Name (Lucide)</label>
+                    <input 
+                      type="text" 
+                      placeholder="Send, Gamepad2, etc."
+                      value={selectedTaskForEdit.icon || ''}
+                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, icon: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Category</label>
+                  <select 
+                    value={selectedTaskForEdit.type}
+                    onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, type: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50 appearance-none"
+                  >
+                    <option value="daily">Daily Section</option>
+                    <option value="achievement">Achievement Section</option>
+                    <option value="partner">Partner Section</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Link / URL</label>
+                  <input 
+                    type="text" 
+                    placeholder="https://t.me/..."
+                    value={selectedTaskForEdit.link}
+                    onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, link: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-bold text-white focus:outline-none focus:border-rose-400/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Button Text</label>
+                  <input 
+                    type="text" 
+                    placeholder="Join, Follow, Play, etc."
+                    value={selectedTaskForEdit.btn || ''}
+                    onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, btn: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                {!isAddingTask && (
+                  <button 
+                    onClick={async () => {
+                      if(confirm("Delete this task?")) {
+                        try {
+                          await updateDoc(doc(db, 'tasks', selectedTaskForEdit.id), { deleted: true });
+                          setSelectedTaskForEdit(null);
+                          WebApp.HapticFeedback.notificationOccurred('warning');
+                        } catch (e) { console.error(e); }
+                      }
+                    }}
+                    className="flex-1 py-5 bg-white/5 text-red-400 font-black uppercase rounded-[24px] border border-red-400/20 active:translate-y-1 transition-all"
+                  >
+                    Delete
+                  </button>
+                )}
+                <button 
+                  onClick={async () => {
+                    if (!selectedTaskForEdit.title || !selectedTaskForEdit.reward) {
+                      alert("Please fill in all required fields.");
+                      return;
+                    }
+                    try {
+                      const taskData = {
+                        ...selectedTaskForEdit,
+                        createdAt: selectedTaskForEdit.createdAt || serverTimestamp()
+                      };
+                      await setDoc(doc(db, 'tasks', selectedTaskForEdit.id), taskData, { merge: true });
+                      setSelectedTaskForEdit(null);
+                      WebApp.HapticFeedback.notificationOccurred('success');
+                    } catch (error) {
+                      console.error("Error saving task:", error);
+                      alert("Failed to save task.");
+                    }
+                  }}
+                  className="flex-[2] py-5 bg-rose-400 text-black font-black uppercase rounded-[24px] flex items-center justify-center gap-2 shadow-lg active:translate-y-1 transition-all"
+                >
+                  <Bolt size={20} /> Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {adminTab === 'analytics' && (
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { label: 'Total Users', value: allUsers.length, color: 'text-white' },
+              { label: 'Total DUCK', value: allUsers.reduce((acc, u) => acc + (u.balance || 0), 0).toFixed(1), color: 'text-cyan-400' },
+              { label: 'Total Volume', value: allUsers.reduce((acc, u) => acc + (u.volume || 0), 0).toFixed(0), color: 'text-white' },
+              { label: 'Active Today', value: analytics?.activeToday || 0, color: 'text-green-400' },
+              { label: 'Joined Today', value: analytics?.joinedToday || 0, color: 'text-blue-400' },
+              { label: 'Total Spins', value: analytics?.totalSpins || 0, color: 'text-purple-400' },
+            ].map((stat, i) => (
+              <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/10 flex flex-col gap-1">
+                <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">{stat.label}</span>
+                <span className={`text-xl font-black ${stat.color}`}>{stat.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {adminTab === 'promo' && (
+          <div className="space-y-6">
+            <button 
+              onClick={() => {
+                const code = prompt("Promo Code:");
+                const reward = parseFloat(prompt("Reward (DUCK):") || "0");
+                const supply = parseInt(prompt("Supply:") || "0");
+                if (code && reward && supply) {
+                  setDoc(doc(db, 'promoCodes', code), { code, reward, supply, claimedBy: [], createdAt: serverTimestamp() });
+                }
+              }}
+              className="w-full py-4 bg-purple-500 text-white font-black uppercase rounded-2xl flex items-center justify-center gap-2 shadow-[0_5px_0_#7c3aed] active:translate-y-1 active:shadow-none transition-all"
+            >
+              <Plus size={20} /> Create Promo Code
+            </button>
+
+            <div className="space-y-3">
+              {allPromoCodes.map(promo => (
+                <div key={promo.id} className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                      <Gift size={20} className="text-purple-400" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black text-white">{promo.code}</span>
+                      <span className="text-[10px] text-white/30 uppercase font-black">{promo.reward} DUCK • {promo.claimedBy?.length || 0}/{promo.supply} Claimed</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => { if(confirm("Delete promo?")) updateDoc(doc(db, 'promoCodes', promo.id), { deleted: true }) }}
+                    className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminTab === 'referral' && (
+          <div className="space-y-6">
+            <button 
+              onClick={() => {
+                const name = prompt("Partner Name:");
+                if (name) {
+                  const id = `ref_${Date.now()}`;
+                  setDoc(doc(db, 'referralLinks', id), { id, name, joins: 0, ads: 0, revenue: 0, createdAt: serverTimestamp() });
+                }
+              }}
+              className="w-full py-4 bg-blue-500 text-white font-black uppercase rounded-2xl flex items-center justify-center gap-2 shadow-[0_5px_0_#2563eb] active:translate-y-1 active:shadow-none transition-all"
+            >
+              <Plus size={20} /> Create Referral Link
+            </button>
+
+            <div className="space-y-3">
+              {allReferralLinks.map(link => (
+                <div key={link.id} className="p-4 bg-white/5 rounded-2xl border border-white/5 flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                        <ExternalLink size={20} className="text-blue-400" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-white">{link.name}</span>
+                        <span className="text-[10px] text-white/30 font-mono">t.me/GiftPhaseBot?start={link.id}</span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => { if(confirm("Delete link?")) updateDoc(doc(db, 'referralLinks', link.id), { deleted: true }) }}
+                      className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-black/20 p-2 rounded-xl text-center">
+                      <div className="text-[8px] font-black text-white/30 uppercase">Joins</div>
+                      <div className="text-xs font-black text-white">{link.joins || 0}</div>
+                    </div>
+                    <div className="bg-black/20 p-2 rounded-xl text-center">
+                      <div className="text-[8px] font-black text-white/30 uppercase">Ads</div>
+                      <div className="text-xs font-black text-white">{link.ads || 0}</div>
+                    </div>
+                    <div className="bg-black/20 p-2 rounded-xl text-center">
+                      <div className="text-[8px] font-black text-white/30 uppercase">Rev</div>
+                      <div className="text-xs font-black text-green-400">${(link.revenue || 0).toFixed(2)}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {adminTab === 'withdrawal' && (
+          <div className="space-y-6">
+            <button 
+              onClick={() => {
+                const amount = parseFloat(prompt("Withdrawal Amount (DUCK):") || "0");
+                const price = parseFloat(prompt("Price (TON):") || "0");
+                if (amount && price) {
+                  const id = `with_${Date.now()}`;
+                  setDoc(doc(db, 'withdrawalOffers', id), { id, amount, price, createdAt: serverTimestamp() });
+                }
+              }}
+              className="w-full py-4 bg-green-500 text-white font-black uppercase rounded-2xl flex items-center justify-center gap-2 shadow-[0_5px_0_#059669] active:translate-y-1 active:shadow-none transition-all"
+            >
+              <Plus size={20} /> Create Withdrawal Offer
+            </button>
+
+            <div className="space-y-3">
+              {allWithdrawalOffers.map(offer => (
+                <div key={offer.id} className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+                      <Coins size={20} className="text-green-400" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black text-white">{offer.amount} DUCK</span>
+                      <span className="text-[10px] text-white/30 uppercase font-black">{offer.price} TON</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => { if(confirm("Delete offer?")) updateDoc(doc(db, 'withdrawalOffers', offer.id), { deleted: true }) }}
+                    className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const App = () => {
   const [activeTab, setActiveTab] = useState('arena');
   const [players, setPlayers] = useState([]);
@@ -1291,769 +2073,6 @@ const App = () => {
     });
   };
 
-  const AdminPanel = () => {
-    const [allUsers, setAllUsers] = useState([]);
-    const [allTransactions, setAllTransactions] = useState([]);
-    const [allPromoCodes, setAllPromoCodes] = useState([]);
-    const [allReferralLinks, setAllReferralLinks] = useState([]);
-    const [allWithdrawalOffers, setAllWithdrawalOffers] = useState([]);
-    const [analytics, setAnalytics] = useState(null);
-    const [adminTab, setAdminTab] = useState('users');
-    const [taskFilter, setTaskFilter] = useState('daily');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedUserForEdit, setSelectedUserForEdit] = useState(null);
-    const [selectedTaskForEdit, setSelectedTaskForEdit] = useState(null);
-    const [isAddingTask, setIsAddingTask] = useState(false);
-    const [isAddingPromo, setIsAddingPromo] = useState(false);
-    const [isAddingReferral, setIsAddingReferral] = useState(false);
-    const [isAddingWithdrawal, setIsAddingWithdrawal] = useState(false);
-
-    useEffect(() => {
-      if (!isAdmin || !user) return;
-      
-      const usersUnsub = onSnapshot(collection(db, 'users'), (snap) => {
-        setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, 'users');
-      });
-
-      const transUnsub = onSnapshot(query(collection(db, 'transactions'), orderBy('createdAt', 'desc'), limit(50)), (snap) => {
-        setAllTransactions(snap.docs.map(d => d.data()));
-      }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, 'transactions');
-      });
-
-      const promoUnsub = onSnapshot(collection(db, 'promoCodes'), (snap) => {
-        setAllPromoCodes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
-
-      const referralUnsub = onSnapshot(collection(db, 'referralLinks'), (snap) => {
-        setAllReferralLinks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
-
-      const withdrawalUnsub = onSnapshot(collection(db, 'withdrawalOffers'), (snap) => {
-        setAllWithdrawalOffers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
-
-      const analyticsUnsub = onSnapshot(doc(db, 'analytics', 'global'), (snap) => {
-        if (snap.exists()) setAnalytics(snap.data());
-      });
-
-      return () => { 
-        usersUnsub(); 
-        transUnsub(); 
-        promoUnsub(); 
-        referralUnsub(); 
-        withdrawalUnsub(); 
-        analyticsUnsub();
-      };
-    }, [isAdmin, user]);
-
-    const filteredUsers = allUsers.filter(u => 
-      u.username?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      u.uid?.includes(searchQuery) ||
-      u.tgId?.toString().includes(searchQuery)
-    );
-
-    return (
-      <div className="fixed inset-0 z-[500] bg-black/95 backdrop-blur-xl flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-cyan-400/20 flex items-center justify-center">
-              <Settings className="text-cyan-400" size={24} />
-            </div>
-            <div>
-              <h2 className="text-xl font-black uppercase italic text-white">Admin Panel</h2>
-              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">System Control Center</p>
-            </div>
-          </div>
-          <button onClick={() => setIsAdminPanelOpen(false)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex overflow-x-auto no-scrollbar border-b border-white/10 shrink-0 bg-white/5">
-          {[
-            { id: 'users', icon: <Users size={18} />, label: 'Users' },
-            { id: 'daily_tasks', icon: <CheckSquare size={18} />, label: 'Daily' },
-            { id: 'achievement_tasks', icon: <Trophy size={18} />, label: 'Achievements' },
-            { id: 'partner_tasks', icon: <Users size={18} />, label: 'Partners' },
-            { id: 'promo', icon: <Gift size={18} />, label: 'Promo' },
-            { id: 'referral', icon: <Link size={18} />, label: 'Referral' },
-            { id: 'analytics', icon: <BarChart2 size={18} />, label: 'Stats' },
-            { id: 'withdrawal', icon: <Coins size={18} />, label: 'Offers' },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setAdminTab(tab.id)}
-              className={`flex items-center gap-2 px-6 py-4 border-b-2 transition-all shrink-0 ${
-                adminTab === tab.id 
-                ? 'border-cyan-400 text-cyan-400 bg-cyan-400/5' 
-                : 'border-transparent text-white/40 hover:text-white/60'
-              }`}
-            >
-              {tab.icon}
-              <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto no-scrollbar p-6">
-          {adminTab === 'users' && (
-            <div className="space-y-6">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
-                  <input 
-                    type="text" 
-                    placeholder="Search by username or UID..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:outline-none focus:border-cyan-400/50 transition-all"
-                  />
-                </div>
-                <button 
-                  className="px-8 bg-rose-400 text-black font-black uppercase rounded-full shadow-lg active:translate-y-1 transition-all"
-                  onClick={() => {/* Search is already filtered by state, but this button matches the UI */}}
-                >
-                  Search
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3">
-                {filteredUsers.map((u, i) => (
-                  <button 
-                    key={i} 
-                    onClick={() => setSelectedUserForEdit(u)}
-                    className="p-4 bg-white/5 rounded-[24px] border border-white/5 flex flex-col gap-4 text-left hover:bg-white/10 transition-all active:scale-[0.98]"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <img src={u.avatar} className="w-12 h-12 rounded-full border border-white/10" referrerPolicy="no-referrer" />
-                        <div className="flex flex-col">
-                          <span className="text-base font-black text-white">{u.username}</span>
-                          <span className="text-[10px] text-white/30 font-mono">ID: {u.tgId || u.uid} • Rank: {u.wins > 100 ? 'Elite' : u.wins > 50 ? 'Pro' : 'Novice'}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-lg font-black text-rose-400">{(u.balance || 0).toFixed(4)}</span>
-                        <DuckIcon size={14} />
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Manage User Modal */}
-          {selectedUserForEdit && (
-            <div className="fixed inset-0 z-[600] bg-black/80 backdrop-blur-sm flex items-end justify-center p-4">
-              <div className="w-full max-w-md bg-[#0a0a0a] rounded-[40px] border border-white/10 p-8 space-y-8 animate-in slide-in-from-bottom duration-300">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-2xl font-black text-white">Manage User</h3>
-                  <button onClick={() => setSelectedUserForEdit(null)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-full border-2 border-rose-400/50 p-1">
-                    <img src={selectedUserForEdit.avatar} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-2xl font-black text-white">{selectedUserForEdit.username}</span>
-                    <span className="text-sm font-bold text-white/30">{selectedUserForEdit.tgId || selectedUserForEdit.uid} ({selectedUserForEdit.username})</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: 'Ads Viewed', value: selectedUserForEdit.adsViewed || 0, color: 'text-rose-400' },
-                    { label: 'Refers', value: selectedUserForEdit.referralsCount || 0, color: 'text-rose-400' },
-                    { label: 'Spins', value: selectedUserForEdit.spinsCount || 0, color: 'text-rose-400' },
-                    { label: 'Promos Used', value: selectedUserForEdit.promosUsed || 0, color: 'text-rose-400' },
-                    { label: 'Tasks Done', value: selectedUserForEdit.completedTasks?.length || 0, color: 'text-rose-400' },
-                    { label: 'Withdrawals', value: selectedUserForEdit.withdrawalsCount || 0, color: 'text-rose-400' },
-                  ].map((stat, i) => (
-                    <div key={i} className="bg-white/5 p-4 rounded-2xl border border-white/5 text-center flex flex-col gap-1">
-                      <span className="text-[9px] font-black text-white/30 uppercase tracking-widest leading-tight">{stat.label}</span>
-                      <span className={`text-lg font-black ${stat.color}`}>{stat.value}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Deposit (DUCK)</label>
-                    <input 
-                      type="number" 
-                      value={selectedUserForEdit.totalDeposited || 0}
-                      onChange={(e) => setSelectedUserForEdit({ ...selectedUserForEdit, totalDeposited: parseFloat(e.target.value) })}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Withdrawal (DUCK)</label>
-                    <input 
-                      type="number" 
-                      value={selectedUserForEdit.totalWithdrawn || 0}
-                      onChange={(e) => setSelectedUserForEdit({ ...selectedUserForEdit, totalWithdrawn: parseFloat(e.target.value) })}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Referrals</label>
-                    <input 
-                      type="number" 
-                      value={selectedUserForEdit.referralsCount || 0}
-                      onChange={(e) => setSelectedUserForEdit({ ...selectedUserForEdit, referralsCount: parseInt(e.target.value) })}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Balance (DUCK)</label>
-                    <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                        <DuckIcon size={14} />
-                      </div>
-                      <input 
-                        type="number" 
-                        value={selectedUserForEdit.balance}
-                        onChange={(e) => setSelectedUserForEdit({ ...selectedUserForEdit, balance: parseFloat(e.target.value) })}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-10 pr-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Puck Balance</label>
-                    <input 
-                      type="number" 
-                      value={selectedUserForEdit.tonBalance}
-                      onChange={(e) => setSelectedUserForEdit({ ...selectedUserForEdit, tonBalance: parseInt(e.target.value) })}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Tier</label>
-                    <div className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white flex items-center justify-center">
-                      {selectedUserForEdit.wins > 100 ? 'Elite' : selectedUserForEdit.wins > 50 ? 'Pro' : 'Novice'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Shop Purchases</label>
-                  <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 min-h-[60px] flex flex-wrap gap-2">
-                    {selectedUserForEdit.shopPurchases?.length > 0 ? (
-                      selectedUserForEdit.shopPurchases.map((item, idx) => (
-                        <span key={idx} className="px-3 py-1 bg-rose-400/10 text-rose-400 text-[10px] font-black uppercase rounded-lg border border-rose-400/20">
-                          {item}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-[10px] font-black text-white/20 uppercase">No purchases yet</span>
-                    )}
-                  </div>
-                </div>
-
-                <button 
-                  onClick={async () => {
-                    try {
-                      await updateDoc(doc(db, 'users', selectedUserForEdit.uid), {
-                        balance: selectedUserForEdit.balance,
-                        tonBalance: selectedUserForEdit.tonBalance,
-                        totalDeposited: selectedUserForEdit.totalDeposited || 0,
-                        totalWithdrawn: selectedUserForEdit.totalWithdrawn || 0,
-                        referralsCount: selectedUserForEdit.referralsCount || 0
-                      });
-                      setSelectedUserForEdit(null);
-                      WebApp.HapticFeedback.notificationOccurred('success');
-                    } catch (error) {
-                      console.error("Error updating user:", error);
-                      alert("Failed to update user.");
-                    }
-                  }}
-                  className="w-full py-6 bg-rose-400 text-black font-black uppercase rounded-[32px] flex items-center justify-center gap-2 shadow-lg active:translate-y-1 transition-all"
-                >
-                  <Bolt size={20} /> Save Changes
-                </button>
-              </div>
-            </div>
-          )}
-
-          {['daily_tasks', 'achievement_tasks', 'partner_tasks'].includes(adminTab) && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-black text-white uppercase italic">
-                  {adminTab === 'daily_tasks' ? 'Daily Tasks' : adminTab === 'achievement_tasks' ? 'Achievement Tasks' : 'Partner Tasks'}
-                </h3>
-                {adminTab === 'achievement_tasks' && (
-                  <button 
-                    onClick={async () => {
-                      if (confirm("This will add 20 achievement tasks. Continue?")) {
-                        const tasks = [
-                          { id: 'ach_game_1', title: 'Play Arena 1 Match', description: 'Play 1 match in the Arena.', reward: 10000, rewardType: 'TON', type: 'achievement', verificationType: 'game', requiredCount: 1, color: '#7C3AED', icon: 'Gamepad2', btn: 'Claim' },
-                          { id: 'ach_game_2', title: 'Play Arena 5 Matches', description: 'Play 5 matches in the Arena.', reward: 50000, rewardType: 'TON', type: 'achievement', verificationType: 'game', requiredCount: 5, color: '#7C3AED', icon: 'Gamepad2', btn: 'Claim' },
-                          { id: 'ach_win_1', title: 'Win Arena 1 Match', description: 'Win 1 match in the Arena.', reward: 25000, rewardType: 'TON', type: 'achievement', verificationType: 'win', requiredCount: 1, color: '#059669', icon: 'Trophy', btn: 'Claim' },
-                          { id: 'ach_win_2', title: 'Win Arena 5 Matches', description: 'Win 5 matches in the Arena.', reward: 150000, rewardType: 'TON', type: 'achievement', verificationType: 'win', requiredCount: 5, color: '#059669', icon: 'Trophy', btn: 'Claim' },
-                          { id: 'ach_dep_1', title: 'Deposit 1 DUCK', description: 'Deposit 1 DUCK into your balance.', reward: 100000, rewardType: 'TON', type: 'achievement', verificationType: 'deposit', requiredCount: 1, color: '#2563EB', icon: 'Wallet', btn: 'Claim' },
-                          { id: 'ach_ref_1', title: 'Invite a friend', description: 'Refer 1 friend to join Gift Phase.', reward: 50000, rewardType: 'TON', type: 'achievement', verificationType: 'referral', requiredCount: 1, color: '#E11D48', icon: 'UserPlus', btn: 'Claim' },
-                          { id: 'ach_shop_1', title: 'First Purchase in Shop', description: 'Make your first purchase in the Shop.', reward: 50000, rewardType: 'TON', type: 'achievement', verificationType: 'purchase', requiredCount: 1, color: '#D97706', icon: 'Store', btn: 'Claim' },
-                          { id: 'ach_shop_2', title: '5th Purchase in Shop', description: 'Make 5 purchases in the Shop.', reward: 250000, rewardType: 'TON', type: 'achievement', verificationType: 'purchase', requiredCount: 5, color: '#D97706', icon: 'Store', btn: 'Claim' },
-                        ];
-                        try {
-                          for (const t of tasks) {
-                            await setDoc(doc(db, 'tasks', t.id), { ...t, createdAt: serverTimestamp() }, { merge: true });
-                          }
-                          WebApp.HapticFeedback.notificationOccurred('success');
-                          alert("20 Achievement tasks seeded successfully!");
-                        } catch (e) { console.error(e); }
-                      }
-                    }}
-                    className="px-4 py-2 bg-white/10 text-white/60 text-[10px] font-black uppercase rounded-lg border border-white/10 hover:bg-white/20 transition-all"
-                  >
-                    Seed Tasks
-                  </button>
-                )}
-              </div>
-
-              <button 
-                onClick={() => {
-                  const currentCat = adminTab === 'daily_tasks' ? 'daily' : adminTab === 'achievement_tasks' ? 'achievement' : 'partner';
-                  setSelectedTaskForEdit({
-                    id: `task_${Date.now()}`,
-                    title: '',
-                    description: '',
-                    reward: 0,
-                    rewardType: 'TON',
-                    type: currentCat,
-                    verificationType: 'none',
-                    link: '',
-                    btn: 'Go',
-                    requiredCount: 0,
-                    color: '',
-                    icon: ''
-                  });
-                  setIsAddingTask(true);
-                }}
-                className="w-full py-5 bg-rose-400 text-black font-black uppercase rounded-[24px] flex items-center justify-center gap-2 shadow-lg active:translate-y-1 transition-all"
-              >
-                <Plus size={20} /> Add New {adminTab === 'daily_tasks' ? 'Daily' : adminTab === 'achievement_tasks' ? 'Achievement' : 'Partner'} Task
-              </button>
-
-              <div className="space-y-3">
-                {allTasks.filter(t => {
-                  const currentCat = adminTab === 'daily_tasks' ? 'daily' : adminTab === 'achievement_tasks' ? 'achievement' : 'partner';
-                  return t.type === currentCat && !t.deleted;
-                }).map(task => (
-                  <button 
-                    key={task.id} 
-                    onClick={() => {
-                      setSelectedTaskForEdit(task);
-                      setIsAddingTask(false);
-                    }}
-                    className="w-full p-5 bg-white/5 rounded-[24px] border border-white/5 flex items-center justify-between hover:bg-white/10 transition-all text-left"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/5">
-                        {(() => {
-                          const title = (task.title || '').toLowerCase();
-                          const link = (task.link || '').toLowerCase();
-                          if (title.includes('deposit')) return <Wallet size={24} className="text-rose-400" />;
-                          if (link.includes('t.me')) {
-                            if (link.includes('bot')) return <Gamepad2 size={24} className="text-rose-400" />;
-                            return <Send size={24} className="text-rose-400 rotate-[-20deg]" />;
-                          }
-                          return <CheckSquare size={24} className="text-rose-400" />;
-                        })()}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-base font-black text-white">{task.title}</span>
-                        <span className="text-[10px] text-white/30 uppercase font-black tracking-widest">
-                          {task.verificationType} • {task.reward} {task.rewardType}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <div className="text-sm font-black text-rose-400">{task.completedCount || 0}</div>
-                        <div className="text-[8px] text-white/20 uppercase font-black">Claims</div>
-                      </div>
-                      <ChevronRight size={20} className="text-white/20" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Manage Task Modal */}
-          {selectedTaskForEdit && (
-            <div className="fixed inset-0 z-[600] bg-black/80 backdrop-blur-sm flex items-end justify-center p-4">
-              <div className="w-full max-w-md bg-[#0a0a0a] rounded-[40px] border border-white/10 p-8 space-y-6 animate-in slide-in-from-bottom duration-300 overflow-y-auto max-h-[90vh] no-scrollbar">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-2xl font-black text-white">{isAddingTask ? 'Add New Task' : 'Manage Task'}</h3>
-                  <button onClick={() => setSelectedTaskForEdit(null)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Title</label>
-                    <input 
-                      type="text" 
-                      placeholder="Display Title"
-                      value={selectedTaskForEdit.title}
-                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, title: e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Description</label>
-                    <textarea 
-                      placeholder="Task description..."
-                      value={selectedTaskForEdit.description}
-                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, description: e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-bold text-white focus:outline-none focus:border-rose-400/50 min-h-[100px] resize-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Reward Amount</label>
-                      <input 
-                        type="number" 
-                        value={selectedTaskForEdit.reward}
-                        onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, reward: parseFloat(e.target.value) })}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Reward Type</label>
-                      <select 
-                        value={selectedTaskForEdit.rewardType}
-                        onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, rewardType: e.target.value })}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50 appearance-none"
-                      >
-                        <option value="TON">TON</option>
-                        <option value="DUCK">DUCK</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Task Configuration (Verification)</label>
-                    <select 
-                      value={selectedTaskForEdit.verificationType}
-                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, verificationType: e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50 appearance-none"
-                    >
-                      <option value="none">No verification needed / Generic</option>
-                      <option value="channel">Telegram Channel</option>
-                      <option value="group">Telegram Group</option>
-                      <option value="bot">Telegram Bot / MiniApp</option>
-                      <option value="referral">Achievement: Referrals</option>
-                      <option value="game">Achievement: Games Played</option>
-                      <option value="win">Achievement: Wins</option>
-                      <option value="deposit">Achievement: DUCK Deposited</option>
-                      <option value="purchase">Achievement: Shop Purchases</option>
-                    </select>
-                  </div>
-
-                  {['referral', 'game', 'win', 'deposit', 'purchase'].includes(selectedTaskForEdit.verificationType) && (
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Required Count / Threshold</label>
-                      <input 
-                        type="number" 
-                        value={selectedTaskForEdit.requiredCount || 0}
-                        onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, requiredCount: parseFloat(e.target.value) })}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
-                      />
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Custom Color (Hex)</label>
-                      <input 
-                        type="text" 
-                        placeholder="#E11D48"
-                        value={selectedTaskForEdit.color || ''}
-                        onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, color: e.target.value })}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Icon Name (Lucide)</label>
-                      <input 
-                        type="text" 
-                        placeholder="Send, Gamepad2, etc."
-                        value={selectedTaskForEdit.icon || ''}
-                        onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, icon: e.target.value })}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Category</label>
-                    <select 
-                      value={selectedTaskForEdit.type}
-                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, type: e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50 appearance-none"
-                    >
-                      <option value="daily">Daily Section</option>
-                      <option value="achievement">Achievement Section</option>
-                      <option value="partner">Partner Section</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Link / URL</label>
-                    <input 
-                      type="text" 
-                      placeholder="https://t.me/..."
-                      value={selectedTaskForEdit.link}
-                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, link: e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-bold text-white focus:outline-none focus:border-rose-400/50"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Button Text</label>
-                    <input 
-                      type="text" 
-                      placeholder="Join, Follow, Play, etc."
-                      value={selectedTaskForEdit.btn || ''}
-                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, btn: e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  {!isAddingTask && (
-                    <button 
-                      onClick={async () => {
-                        if(confirm("Delete this task?")) {
-                          try {
-                            await updateDoc(doc(db, 'tasks', selectedTaskForEdit.id), { deleted: true });
-                            setSelectedTaskForEdit(null);
-                            WebApp.HapticFeedback.notificationOccurred('warning');
-                          } catch (e) { console.error(e); }
-                        }
-                      }}
-                      className="flex-1 py-5 bg-white/5 text-red-400 font-black uppercase rounded-[24px] border border-red-400/20 active:translate-y-1 transition-all"
-                    >
-                      Delete
-                    </button>
-                  )}
-                  <button 
-                    onClick={async () => {
-                      if (!selectedTaskForEdit.title || !selectedTaskForEdit.reward) {
-                        alert("Please fill in all required fields.");
-                        return;
-                      }
-                      try {
-                        const taskData = {
-                          ...selectedTaskForEdit,
-                          createdAt: selectedTaskForEdit.createdAt || serverTimestamp()
-                        };
-                        await setDoc(doc(db, 'tasks', selectedTaskForEdit.id), taskData, { merge: true });
-                        setSelectedTaskForEdit(null);
-                        WebApp.HapticFeedback.notificationOccurred('success');
-                      } catch (error) {
-                        console.error("Error saving task:", error);
-                        alert("Failed to save task.");
-                      }
-                    }}
-                    className="flex-[2] py-5 bg-rose-400 text-black font-black uppercase rounded-[24px] flex items-center justify-center gap-2 shadow-lg active:translate-y-1 transition-all"
-                  >
-                    <Save size={20} /> Save Changes
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {adminTab === 'analytics' && (
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: 'Total Users', value: allUsers.length, color: 'text-white' },
-                { label: 'Total DUCK', value: allUsers.reduce((acc, u) => acc + (u.balance || 0), 0).toFixed(1), color: 'text-cyan-400' },
-                { label: 'Total Volume', value: allUsers.reduce((acc, u) => acc + (u.volume || 0), 0).toFixed(0), color: 'text-white' },
-                { label: 'Active Today', value: analytics?.activeToday || 0, color: 'text-green-400' },
-                { label: 'Joined Today', value: analytics?.joinedToday || 0, color: 'text-blue-400' },
-                { label: 'Total Spins', value: analytics?.totalSpins || 0, color: 'text-purple-400' },
-              ].map((stat, i) => (
-                <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/10 flex flex-col gap-1">
-                  <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">{stat.label}</span>
-                  <span className={`text-xl font-black ${stat.color}`}>{stat.value}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {adminTab === 'promo' && (
-            <div className="space-y-6">
-              <button 
-                onClick={() => {
-                  const code = prompt("Promo Code:");
-                  const reward = parseFloat(prompt("Reward (DUCK):") || "0");
-                  const supply = parseInt(prompt("Supply:") || "0");
-                  if (code && reward && supply) {
-                    setDoc(doc(db, 'promoCodes', code), { code, reward, supply, claimedBy: [], createdAt: serverTimestamp() });
-                  }
-                }}
-                className="w-full py-4 bg-purple-500 text-white font-black uppercase rounded-2xl flex items-center justify-center gap-2 shadow-[0_5px_0_#7c3aed] active:translate-y-1 active:shadow-none transition-all"
-              >
-                <Plus size={20} /> Create Promo Code
-              </button>
-
-              <div className="space-y-3">
-                {allPromoCodes.map(promo => (
-                  <div key={promo.id} className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
-                        <Gift size={20} className="text-purple-400" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-black text-white">{promo.code}</span>
-                        <span className="text-[10px] text-white/30 uppercase font-black">{promo.reward} DUCK • {promo.claimedBy?.length || 0}/{promo.supply} Claimed</span>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => { if(confirm("Delete promo?")) updateDoc(doc(db, 'promoCodes', promo.id), { deleted: true }) }}
-                      className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {adminTab === 'referral' && (
-            <div className="space-y-6">
-              <button 
-                onClick={() => {
-                  const name = prompt("Partner Name:");
-                  if (name) {
-                    const id = `ref_${Date.now()}`;
-                    setDoc(doc(db, 'referralLinks', id), { id, name, joins: 0, ads: 0, revenue: 0, createdAt: serverTimestamp() });
-                  }
-                }}
-                className="w-full py-4 bg-blue-500 text-white font-black uppercase rounded-2xl flex items-center justify-center gap-2 shadow-[0_5px_0_#2563eb] active:translate-y-1 active:shadow-none transition-all"
-              >
-                <Plus size={20} /> Create Referral Link
-              </button>
-
-              <div className="space-y-3">
-                {allReferralLinks.map(link => (
-                  <div key={link.id} className="p-4 bg-white/5 rounded-2xl border border-white/5 flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
-                          <ExternalLink size={20} className="text-blue-400" />
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-black text-white">{link.name}</span>
-                          <span className="text-[10px] text-white/30 font-mono">t.me/GiftPhaseBot?start={link.id}</span>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => { if(confirm("Delete link?")) updateDoc(doc(db, 'referralLinks', link.id), { deleted: true }) }}
-                        className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="bg-black/20 p-2 rounded-xl text-center">
-                        <div className="text-[8px] font-black text-white/30 uppercase">Joins</div>
-                        <div className="text-xs font-black text-white">{link.joins || 0}</div>
-                      </div>
-                      <div className="bg-black/20 p-2 rounded-xl text-center">
-                        <div className="text-[8px] font-black text-white/30 uppercase">Ads</div>
-                        <div className="text-xs font-black text-white">{link.ads || 0}</div>
-                      </div>
-                      <div className="bg-black/20 p-2 rounded-xl text-center">
-                        <div className="text-[8px] font-black text-white/30 uppercase">Rev</div>
-                        <div className="text-xs font-black text-green-400">${(link.revenue || 0).toFixed(2)}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {adminTab === 'withdrawal' && (
-            <div className="space-y-6">
-              <button 
-                onClick={() => {
-                  const title = prompt("Offer Title:");
-                  const min = parseFloat(prompt("Min Amount (DUCK):") || "0");
-                  const max = parseFloat(prompt("Max Amount (DUCK):") || "0");
-                  if (title && min && max) {
-                    const id = `off_${Date.now()}`;
-                    setDoc(doc(db, 'withdrawalOffers', id), { id, title, minAmount: min, maxAmount: max, createdAt: serverTimestamp() });
-                  }
-                }}
-                className="w-full py-4 bg-green-500 text-white font-black uppercase rounded-2xl flex items-center justify-center gap-2 shadow-[0_5px_0_#16a34a] active:translate-y-1 active:shadow-none transition-all"
-              >
-                <Plus size={20} /> Create Withdrawal Offer
-              </button>
-
-              <div className="space-y-3">
-                {allWithdrawalOffers.map(offer => (
-                  <div key={offer.id} className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
-                        <Coins size={20} className="text-green-400" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-black text-white">{offer.title}</span>
-                        <span className="text-[10px] text-white/30 uppercase font-black">{offer.minAmount}-{offer.maxAmount} DUCK</span>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => { if(confirm("Delete offer?")) updateDoc(doc(db, 'withdrawalOffers', offer.id), { deleted: true }) }}
-                      className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {adminTab === 'messages' && (
-            <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
-              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-                <MessageSquare size={32} />
-              </div>
-              <p className="text-xs font-black uppercase tracking-widest">Admin Chat Coming Soon</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
   const handleDeposit = async () => {
     const amount = parseFloat(prompt("Enter DUCK amount to deposit:", "10") || "0");
     if (!isNaN(amount) && amount > 0 && user) {
@@ -2175,8 +2194,8 @@ const App = () => {
     const isBidDisabled = (status !== 'waiting') || (timeLeft === 1 && players.length >= 2);
 
     return (
-    <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10 pt-12">
-      <div className="flex justify-between items-center p-4 pt-6 gap-2 shrink-0">
+    <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10 pt-20 px-4">
+      <div className="flex justify-between items-center p-4 pt-8 gap-2 shrink-0">
         <div className={`px-4 py-2 rounded-full flex items-center justify-center gap-2 min-w-0 font-sans bg-[#1a1a1a] shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)] border border-white/10`}><TonIcon size={20} /><span className="text-[15px] font-black uppercase akira-font leading-none">{formatCurrency(tonBalance)}<span className="font-black text-lg ml-0.5">+</span></span></div>
         <div className="bg-black/40 px-3 py-1.5 rounded-full border border-white/5 flex items-center gap-1.5 shrink-0 font-sans shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_#22c55e]"></div><span className="text-[10px] font-bold text-gray-300">117 online</span></div>
         <div className={`px-4 py-2 rounded-full flex items-center justify-center gap-2 min-w-0 font-sans bg-[#1a1a1a] shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)] border border-white/10`}><DuckIcon size={20} /><span className="text-[15px] font-black uppercase akira-font leading-none">{formatCurrency(myBalance)}<span className="font-black text-lg ml-0.5">+</span></span></div>
@@ -2444,9 +2463,9 @@ const App = () => {
     };
 
     return (
-      <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10 pt-12">
+      <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10 pt-20 px-4">
         <div className="absolute top-0 left-0 right-0 h-[450px] bg-gradient-to-b from-[#2563EB]/25 via-[#1E40AF]/5 to-transparent pointer-events-none"></div>
-        <div className="w-full px-4 pt-10 shrink-0 relative z-20">
+        <div className="w-full px-4 pt-12 shrink-0 relative z-20">
           <div ref={promoRef} className="w-full h-44 overflow-x-auto snap-x snap-mandatory no-scrollbar flex gap-4 scroll-smooth">
             {PROMO_BANNERS.map((promo) => (
               <div key={promo.id} className={`min-w-full h-full rounded-[36px] bg-gradient-to-br ${promo.grad} snap-center flex items-center p-8 border-t border-white/30 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden relative`}>
@@ -2602,8 +2621,8 @@ const App = () => {
   };
 
   const renderRank = () => (
-    <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative z-10 px-4 pt-12">
-      <div className="flex flex-col items-center p-6 pt-10 pb-4 relative z-10 text-center">
+    <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative z-10 px-6 pt-20">
+      <div className="flex flex-col items-center p-6 pt-12 pb-4 relative z-10 text-center">
         <div className="mb-2 relative">
           <div className="absolute inset-0 bg-cyan-400/20 blur-2xl animate-pulse rounded-full"></div>
           <Trophy className="text-cyan-400 relative z-10 animate-bounce" size={48} strokeWidth={2.5} />
@@ -2659,7 +2678,7 @@ const App = () => {
     const avatar = tgUser?.photo_url || user?.photoURL || DEFAULT_AVATAR;
 
     return (
-      <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative px-4 z-10 pt-12">
+      <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative px-6 z-10 pt-20">
         {!isAuthReady ? (
           <div className="space-y-6 py-10">
             <div className="flex items-center gap-6">
@@ -2778,7 +2797,7 @@ const App = () => {
         .animate-crypto-slide { animation: cryptoSlide 10s linear infinite; }
       `}</style>
       <SparkleBackground />
-      {isAdminPanelOpen && <AdminPanel />}
+      {isAdminPanelOpen && <AdminPanel isAdmin={isAdmin} user={user} allTasks={allTasks} setIsAdminPanelOpen={setIsAdminPanelOpen} t={t} DuckIcon={DuckIcon} TonIcon={TonIcon} />}
       {isFrameSelectorOpen && (
         <div className="fixed inset-0 z-[600] bg-black/80 backdrop-blur-sm flex items-end justify-center p-4">
           <div className="w-full max-w-md bg-[#0a0a0a] rounded-[40px] border border-white/10 p-8 space-y-6 animate-in slide-in-from-bottom duration-300 overflow-y-auto max-h-[85vh] no-scrollbar">
@@ -2862,8 +2881,8 @@ const App = () => {
         {isGameLoaded && activeTab === 'profile' && renderProfile()}
         {isGameLoaded && activeTab === 'rank' && renderRank()}
         {isGameLoaded && activeTab === 'market' && (
-          <div className="flex-1 flex flex-col p-4 relative z-10 overflow-y-auto no-scrollbar pb-40">
-            <div className="flex flex-col items-center mb-8 pt-6">
+          <div className="flex-1 flex flex-col p-6 relative z-10 overflow-y-auto no-scrollbar pb-40 pt-16">
+            <div className="flex flex-col items-center mb-10 pt-8">
               <div className="bg-[#E91E63] px-8 py-2 rounded-lg shadow-[0_4px_0_#AD1457] border-2 border-[#FFD54F] mb-4 transform -skew-x-12">
                 <h1 className="text-xl font-black text-white uppercase italic tracking-wider skew-x-12">VIP PACKS</h1>
               </div>
