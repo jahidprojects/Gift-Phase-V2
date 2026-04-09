@@ -2194,8 +2194,8 @@ const App = () => {
     const isBidDisabled = (status !== 'waiting') || (timeLeft === 1 && players.length >= 2);
 
     return (
-    <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10 pt-20 px-4">
-      <div className="flex justify-between items-center p-4 pt-8 gap-2 shrink-0">
+    <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10 pt-6 px-4">
+      <div className="flex justify-between items-center p-4 pt-2 gap-2 shrink-0">
         <div className={`px-4 py-2 rounded-full flex items-center justify-center gap-2 min-w-0 font-sans bg-[#1a1a1a] shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)] border border-white/10`}><TonIcon size={20} /><span className="text-[15px] font-black uppercase akira-font leading-none">{formatCurrency(tonBalance)}<span className="font-black text-lg ml-0.5">+</span></span></div>
         <div className="bg-black/40 px-3 py-1.5 rounded-full border border-white/5 flex items-center gap-1.5 shrink-0 font-sans shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]"><div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_#22c55e]"></div><span className="text-[10px] font-bold text-gray-300">117 online</span></div>
         <div className={`px-4 py-2 rounded-full flex items-center justify-center gap-2 min-w-0 font-sans bg-[#1a1a1a] shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)] border border-white/10`}><DuckIcon size={20} /><span className="text-[15px] font-black uppercase akira-font leading-none">{formatCurrency(myBalance)}<span className="font-black text-lg ml-0.5">+</span></span></div>
@@ -2463,9 +2463,9 @@ const App = () => {
     };
 
     return (
-      <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10 pt-20 px-4">
+      <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10 pt-6 px-4">
         <div className="absolute top-0 left-0 right-0 h-[450px] bg-gradient-to-b from-[#2563EB]/25 via-[#1E40AF]/5 to-transparent pointer-events-none"></div>
-        <div className="w-full px-4 pt-12 shrink-0 relative z-20">
+        <div className="w-full px-4 pt-4 shrink-0 relative z-20">
           <div ref={promoRef} className="w-full h-44 overflow-x-auto snap-x snap-mandatory no-scrollbar flex gap-4 scroll-smooth">
             {PROMO_BANNERS.map((promo) => (
               <div key={promo.id} className={`min-w-full h-full rounded-[36px] bg-gradient-to-br ${promo.grad} snap-center flex items-center p-8 border-t border-white/30 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden relative`}>
@@ -2678,7 +2678,7 @@ const App = () => {
     const avatar = tgUser?.photo_url || user?.photoURL || DEFAULT_AVATAR;
 
     return (
-      <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative px-6 z-10 pt-20">
+      <div className="flex-1 bg-[#0d0d0d] flex flex-col overflow-y-auto no-scrollbar pb-40 relative px-6 z-10 pt-6">
         {!isAuthReady ? (
           <div className="space-y-6 py-10">
             <div className="flex items-center gap-6">
@@ -2692,7 +2692,7 @@ const App = () => {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-6 py-10 shrink-0 relative z-10">
+            <div className="flex items-center gap-6 py-6 shrink-0 relative z-10">
               <div className="relative">
                 <div 
                   onClick={handleAdminTrigger} 
