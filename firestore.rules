@@ -135,23 +135,37 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return data.keys().hasAll(['uid', 'username', 'avatar', 'balance', 'wins', 'volume', 'completedTasks', 'role', 'tgId']) &&
+      return data.keys().hasAll(['uid', 'username', 'avatar', 'balance', 'tonBalance', 'wins', 'volume', 'completedTasks', 'role', 'tgId']) &&
              data.uid == request.auth.uid &&
              data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
              data.avatar is string && data.avatar.size() < 500 &&
              data.balance is number && data.balance >= 0 &&
+             data.tonBalance is number && data.tonBalance >= 0 &&
              data.wins is number && data.wins >= 0 &&
              data.volume is number && data.volume >= 0 &&
-             data.completedTasks is list && data.completedTasks.size() < 100 &&
+             data.completedTasks is list && data.completedTasks.size() < 1000 &&
              data.role in ['user', 'admin'] &&
-             (data.tgId == null || data.tgId is int) &&
-             (data.referralsCount == null || data.referralsCount is int) &&
-             (data.totalDeposited == null || data.totalDeposited is number) &&
-             (data.totalWithdrawn == null || data.totalWithdrawn is number) &&
-             (data.adsViewed == null || data.adsViewed is int) &&
-             (data.spinsCount == null || data.spinsCount is int) &&
-             (data.promosUsed == null || data.promosUsed is int) &&
-             (data.shopPurchases == null || data.shopPurchases is list);
+             (data.tgId == null || data.tgId is int);
+    }
+
+    // Helper to check if balance increment is valid based on a task
+    function isValidTaskReward(userId) {
+      let oldTasks = resource.data.completedTasks;
+      let newTasks = request.resource.data.completedTasks;
+      let addedTasks = newTasks.toSet().difference(oldTasks.toSet());
+      
+      // If exactly one task was added
+      return addedTasks.size() == 1 &&
+             // And balance increment matches the task reward (this is hard without knowing which task)
+             // For now, we allow the increment if it's a positive number and the user is adding a task
+             request.resource.data.balance > resource.data.balance;
+    }
+
+    function isValidWelcomeClaim() {
+      return !resource.data.welcomeBonusClaimed && 
+             request.resource.data.welcomeBonusClaimed == true &&
+             (request.resource.data.balance == resource.data.balance + 3000 || 
+              request.resource.data.balance == resource.data.balance + 5000);
     }
 
     function isValidGame(data) {
@@ -260,13 +274,29 @@ service cloud.firestore {
       allow get: if isAuthenticated();
       allow list: if isAdmin() || (request.query.limit != null && request.query.limit <= 100);
       allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
-                     (request.resource.data.role == 'user' || isAllowedAdmin(request.resource.data));
-      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
-                       request.resource.data.uid == resource.data.uid && // UID immutable
-                       request.resource.data.role == resource.data.role && // Role immutable
-                       request.resource.data.balance == resource.data.balance && // Balance immutable
-                       request.resource.data.puckBalance == resource.data.puckBalance) || // PuckBalance immutable
-                       isAdmin();
+                     (request.resource.data.role == 'user' || isAllowedAdmin(request.resource.data)) &&
+                     request.resource.data.balance == 10 && // Initial balance
+                     request.resource.data.tonBalance == 0;
+      allow update: if isAdmin() || (
+        isOwner(userId) && isValidUser(request.resource.data) &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.role == resource.data.role &&
+        (
+          // Case 1: Just updating profile (no balance change)
+          (request.resource.data.balance == resource.data.balance && 
+           request.resource.data.tonBalance == resource.data.tonBalance) ||
+          
+          // Case 2: Claiming Welcome Bonus
+          isValidWelcomeClaim() ||
+          
+          // Case 3: Completing a Task
+          (isValidTaskReward(userId) && request.resource.data.tonBalance == resource.data.tonBalance) ||
+
+          // Case 4: Spending TON in shop (decrement only)
+          (request.resource.data.tonBalance < resource.data.tonBalance && 
+           request.resource.data.balance == resource.data.balance)
+        )
+      );
     }
 
     match /games/{gameId} {

@@ -20,7 +20,9 @@ import {
   serverTimestamp,
   increment,
   arrayUnion,
-  getDocFromServer
+  getDocFromServer,
+  writeBatch,
+  getDocs
 } from 'firebase/firestore';
 
 // Validate Connection to Firestore
@@ -61,6 +63,7 @@ import {
   Share2,
   History,
   Link,
+  ShieldAlert,
   ArrowDownCircle,
   ArrowUpCircle,
   Plus,
@@ -570,6 +573,22 @@ const formatCurrencySimple = (val) => {
   return Math.floor(absoluteVal).toLocaleString();
 };
 
+// --- UTILS ---
+const safeStorage = {
+  get: (key: string) => {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      return null;
+    }
+  },
+  set: (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {}
+  }
+};
+
 const AdminPanel = ({ 
   isAdmin, 
   user, 
@@ -577,7 +596,8 @@ const AdminPanel = ({
   setIsAdminPanelOpen, 
   t,
   DuckIcon,
-  TonIcon
+  TonIcon,
+  handleResetAllBalances
 }: { 
   isAdmin: boolean, 
   user: FirebaseUser | null, 
@@ -585,7 +605,8 @@ const AdminPanel = ({
   setIsAdminPanelOpen: (open: boolean) => void,
   t: any,
   DuckIcon: any,
-  TonIcon: any
+  TonIcon: any,
+  handleResetAllBalances: () => void
 }) => {
   const [allUsers, setAllUsers] = useState([]);
   const [allTransactions, setAllTransactions] = useState([]);
@@ -620,18 +641,26 @@ const AdminPanel = ({
 
     const promoUnsub = onSnapshot(collection(db, 'promoCodes'), (snap) => {
       setAllPromoCodes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'promoCodes');
     });
 
     const referralUnsub = onSnapshot(collection(db, 'referralLinks'), (snap) => {
       setAllReferralLinks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'referralLinks');
     });
 
     const withdrawalUnsub = onSnapshot(collection(db, 'withdrawalOffers'), (snap) => {
       setAllWithdrawalOffers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'withdrawalOffers');
     });
 
     const analyticsUnsub = onSnapshot(doc(db, 'analytics', 'global'), (snap) => {
       if (snap.exists()) setAnalytics(snap.data());
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'analytics/global');
     });
 
     return () => { 
@@ -677,6 +706,7 @@ const AdminPanel = ({
           { id: 'referral', icon: <Link size={20} /> },
           { id: 'analytics', icon: <BarChart2 size={20} /> },
           { id: 'withdrawal', icon: <Coins size={20} /> },
+          { id: 'system', icon: <ShieldAlert size={20} /> },
         ].map(tab => (
           <button
             key={tab.id}
@@ -873,7 +903,7 @@ const AdminPanel = ({
                     WebApp.HapticFeedback.notificationOccurred('success');
                   } catch (error) {
                     console.error("Error updating user:", error);
-                    alert("Failed to update user.");
+                    WebApp.showAlert("Failed to update user.");
                   }
                 }}
                 className="w-full py-6 bg-rose-400 text-black font-black uppercase rounded-[32px] flex items-center justify-center gap-2 shadow-lg active:translate-y-1 transition-all"
@@ -1115,14 +1145,16 @@ const AdminPanel = ({
               <div className="flex gap-3 pt-4">
                 {!isAddingTask && (
                   <button 
-                    onClick={async () => {
-                      if(confirm("Delete this task?")) {
-                        try {
-                          await updateDoc(doc(db, 'tasks', selectedTaskForEdit.id), { deleted: true });
-                          setSelectedTaskForEdit(null);
-                          WebApp.HapticFeedback.notificationOccurred('warning');
-                        } catch (e) { console.error(e); }
-                      }
+                    onClick={() => {
+                      WebApp.showConfirm("Delete this task?", async (confirmed) => {
+                        if (confirmed) {
+                          try {
+                            await updateDoc(doc(db, 'tasks', selectedTaskForEdit.id), { deleted: true });
+                            setSelectedTaskForEdit(null);
+                            WebApp.HapticFeedback.notificationOccurred('warning');
+                          } catch (e) { console.error(e); }
+                        }
+                      });
                     }}
                     className="flex-1 py-5 bg-white/5 text-red-400 font-black uppercase rounded-[24px] border border-red-400/20 active:translate-y-1 transition-all"
                   >
@@ -1132,7 +1164,7 @@ const AdminPanel = ({
                 <button 
                   onClick={async () => {
                     if (!selectedTaskForEdit.title || (!selectedTaskForEdit.duckReward && !selectedTaskForEdit.tonReward)) {
-                      alert("Please fill in Title and at least one reward.");
+                      WebApp.showAlert("Please fill in Title and at least one reward.");
                       return;
                     }
                     try {
@@ -1145,7 +1177,7 @@ const AdminPanel = ({
                       WebApp.HapticFeedback.notificationOccurred('success');
                     } catch (error) {
                       console.error("Error saving task:", error);
-                      alert("Failed to save task.");
+                      WebApp.showAlert("Failed to save task.");
                     }
                   }}
                   className="flex-[2] py-5 bg-rose-400 text-black font-black uppercase rounded-[24px] flex items-center justify-center gap-2 shadow-lg active:translate-y-1 transition-all"
@@ -1204,7 +1236,11 @@ const AdminPanel = ({
                     </div>
                   </div>
                   <button 
-                    onClick={() => { if(confirm("Delete promo?")) updateDoc(doc(db, 'promoCodes', promo.id), { deleted: true }) }}
+                    onClick={() => { 
+                      WebApp.showConfirm("Delete promo?", (confirmed) => {
+                        if (confirmed) updateDoc(doc(db, 'promoCodes', promo.id), { deleted: true });
+                      });
+                    }}
                     className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
                   >
                     <Trash2 size={18} />
@@ -1244,7 +1280,11 @@ const AdminPanel = ({
                       </div>
                     </div>
                     <button 
-                      onClick={() => { if(confirm("Delete link?")) updateDoc(doc(db, 'referralLinks', link.id), { deleted: true }) }}
+                      onClick={() => { 
+                        WebApp.showConfirm("Delete link?", (confirmed) => {
+                          if (confirmed) updateDoc(doc(db, 'referralLinks', link.id), { deleted: true });
+                        });
+                      }}
                       className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
                     >
                       <Trash2 size={18} />
@@ -1299,13 +1339,41 @@ const AdminPanel = ({
                     </div>
                   </div>
                   <button 
-                    onClick={() => { if(confirm("Delete offer?")) updateDoc(doc(db, 'withdrawalOffers', offer.id), { deleted: true }) }}
+                    onClick={() => { 
+                      WebApp.showConfirm("Delete offer?", (confirmed) => {
+                        if (confirmed) updateDoc(doc(db, 'withdrawalOffers', offer.id), { deleted: true });
+                      });
+                    }}
                     className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
                   >
                     <Trash2 size={18} />
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {adminTab === 'system' && (
+          <div className="space-y-6">
+            <div className="p-6 bg-red-500/10 rounded-[32px] border border-red-500/20 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                  <ShieldAlert className="text-red-500" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white uppercase italic">Danger Zone</h3>
+                  <p className="text-[10px] font-bold text-white/40 uppercase">Critical System Actions</p>
+                </div>
+              </div>
+              
+              <button 
+                onClick={handleResetAllBalances}
+                className="w-full py-4 bg-red-500 text-white font-black uppercase rounded-2xl flex items-center justify-center gap-2 shadow-[0_5px_0_#b91c1c] active:translate-y-1 active:shadow-none transition-all"
+              >
+                <Trash2 size={20} /> Reset All User Balances
+              </button>
+              <p className="text-[10px] text-center text-white/30 uppercase font-bold">This will set all users DUCK and TON balances to 0.</p>
             </div>
           </div>
         )}
@@ -1339,7 +1407,7 @@ const App = () => {
   const [rankTab, setRankTab] = useState('players');
   const [isGameLoaded, setIsGameLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [isLiked, setIsLiked] = useState(() => localStorage.getItem('giftphase_liked') === 'true');
+  const [isLiked, setIsLiked] = useState(() => safeStorage.get('giftphase_liked') === 'true');
   const [isLoadingStarted, setIsLoadingStarted] = useState(false);
   const [adminClickCount, setAdminClickCount] = useState(0);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
@@ -1350,19 +1418,25 @@ const App = () => {
   const [waitTimer, setWaitTimer] = useState(0);
   const [isFrameSelectorOpen, setIsFrameSelectorOpen] = useState(false);
   const [customBid, setCustomBid] = useState<number | null>(null);
+  const [showWelcomePopup, setShowWelcomePopup] = useState(false);
+  const [welcomeReward, setWelcomeReward] = useState(0);
+  const [referrerName, setReferrerName] = useState('');
+  const [isClaimingWelcome, setIsClaimingWelcome] = useState(false);
+  const processingTasksRef = useRef<Set<string>>(new Set());
   const [hasPlayedBefore, setHasPlayedBefore] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('giftphase_played') === 'true';
-    }
-    return false;
+    return safeStorage.get('giftphase_played') === 'true';
   });
 
   const { walletAddress, connected, tonConnectUI } = useTonConnect();
+
+  const userUnsubRef = useRef<(() => void) | null>(null);
 
   // Firebase Auth & Profile Sync with Telegram Identity
   useEffect(() => {
     const tasksUnsub = onSnapshot(collection(db, 'tasks'), (snap) => {
       setAllTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'tasks');
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -1373,7 +1447,8 @@ const App = () => {
         setUser(firebaseUser);
         const userRef = doc(db, 'users', firebaseUser.uid);
         
-        const userUnsub = onSnapshot(userRef, (snap) => {
+        if (userUnsubRef.current) userUnsubRef.current();
+        userUnsubRef.current = onSnapshot(userRef, (snap) => {
           if (snap.exists()) {
             const data = snap.data();
             setUserData(data);
@@ -1381,12 +1456,22 @@ const App = () => {
             setTonBalance(data.tonBalance ?? data.puckBalance ?? 0);
             setCompletedTaskIds(data.completedTasks || []);
             
-            // Welcome Bonus Logic (100k Duck)
+            // Welcome Bonus Logic
             if (!data.welcomeBonusClaimed) {
-              updateDoc(userRef, {
-                balance: increment(100000),
-                welcomeBonusClaimed: true
-              });
+              const reward = referrerId ? 5000 : 3000;
+              setWelcomeReward(reward);
+              if (referrerId) {
+                getDoc(doc(db, 'users', referrerId)).then(refSnap => {
+                  if (refSnap.exists()) {
+                    setReferrerName(refSnap.data().username || 'Someone');
+                  }
+                  setShowWelcomePopup(true);
+                }).catch(() => {
+                  setShowWelcomePopup(true);
+                });
+              } else {
+                setShowWelcomePopup(true);
+              }
             }
 
             const ADMIN_TG_IDS = [6686954447, 1678112785, 5968063026];
@@ -1453,15 +1538,19 @@ const App = () => {
           console.error("Auth Error:", err);
           if (err.code === 'auth/admin-restricted-operation') {
             const msg = "CRITICAL: Anonymous Authentication is disabled or restricted.\n\nTo fix this:\n1. Go to Firebase Console > Authentication > Sign-in method.\n2. Enable 'Anonymous'.\n3. If it's already enabled, check your Google Cloud Console API Key restrictions and ensure 'Identity Toolkit API' is allowed.\n4. Refresh this app.";
-            alert(msg);
+            WebApp.showAlert(msg);
           } else {
-            alert("Authentication Error: " + err.message);
+            WebApp.showAlert("Authentication Error: " + err.message);
           }
           setIsAuthReady(true);
         });
       }
     });
-    return () => unsubscribe();
+    return () => {
+      tasksUnsub();
+      unsubscribe();
+      if (userUnsubRef.current) userUnsubRef.current();
+    };
   }, []);
 
   // Sync Wallet Address to Firestore
@@ -1586,19 +1675,19 @@ const App = () => {
   }, [hasPlayedBefore]);
 
   useEffect(() => {
-    localStorage.setItem('hegmo_balance', myBalance.toString());
+    safeStorage.set('hegmo_balance', myBalance.toString());
   }, [myBalance]);
 
   useEffect(() => {
-    localStorage.setItem('hegmo_tasks', JSON.stringify(completedTaskIds));
+    safeStorage.set('hegmo_tasks', JSON.stringify(completedTaskIds));
   }, [completedTaskIds]);
 
   useEffect(() => {
-    localStorage.setItem('hegmo_wallet_connected', isWalletConnected.toString());
+    safeStorage.set('hegmo_wallet_connected', isWalletConnected.toString());
   }, [isWalletConnected]);
 
   useEffect(() => {
-    localStorage.setItem('hegmo_lang', langIdx.toString());
+    safeStorage.set('hegmo_lang', langIdx.toString());
   }, [langIdx]);
 
   const promoRef = useRef(null);
@@ -1919,7 +2008,7 @@ const App = () => {
     if (cleanAmt < 1) return;
 
     if (isMe && myBalance < cleanAmt) {
-      alert("Insufficient DUCK balance!");
+      WebApp.showAlert("Insufficient DUCK balance!");
       return;
     }
     
@@ -1999,7 +2088,9 @@ const App = () => {
   };
 
   const handleTaskClick = async (taskId) => {
-    if (!taskId || completedTaskIds.includes(taskId) || !user) return;
+    if (!taskId || completedTaskIds.includes(taskId) || !user || processingTasksRef.current.has(taskId)) return;
+    
+    processingTasksRef.current.add(taskId);
     const task = allTasks.find(t => t.id === taskId) || 
                  DAILY_TASKS.find(t => t.id === taskId) || 
                  ACHIEVEMENTS.find(t => t.id === taskId) || 
@@ -2042,8 +2133,68 @@ const App = () => {
         WebApp.HapticFeedback.notificationOccurred('success');
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+        // Rollback local state if failed
+        setCompletedTaskIds(prev => prev.filter(id => id !== taskId));
+        if (duckReward > 0) setMyBalance(prev => Math.max(0, prev - duckReward));
+        if (tonReward > 0) setTonBalance(prev => Math.max(0, prev - tonReward));
+      } finally {
+        processingTasksRef.current.delete(taskId);
       }
+    } else {
+      processingTasksRef.current.delete(taskId);
     }
+  };
+
+  const handleClaimWelcomeBonus = async () => {
+    if (!user || !userData || userData.welcomeBonusClaimed || isClaimingWelcome) return;
+    
+    setIsClaimingWelcome(true);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      // Double check in Firestore before updating
+      const snap = await getDoc(userRef);
+      if (snap.exists() && snap.data().welcomeBonusClaimed) {
+        setShowWelcomePopup(false);
+        setIsClaimingWelcome(false);
+        return;
+      }
+
+      await updateDoc(userRef, {
+        balance: increment(welcomeReward),
+        welcomeBonusClaimed: true
+      });
+      setMyBalance(prev => prev + welcomeReward);
+      setShowWelcomePopup(false);
+      WebApp.HapticFeedback.notificationOccurred('success');
+    } catch (error) {
+      console.error("Error claiming welcome bonus:", error);
+    } finally {
+      setIsClaimingWelcome(false);
+    }
+  };
+
+  const handleResetAllBalances = async () => {
+    if (!isAdmin) return;
+    WebApp.showConfirm("Are you sure you want to RESET ALL user balances (DUCK & TON) to 0? This cannot be undone.", async (confirmed) => {
+      if (confirmed) {
+        try {
+          const usersSnap = await getDocs(collection(db, 'users'));
+          const batch = writeBatch(db);
+          usersSnap.docs.forEach(userDoc => {
+            batch.update(userDoc.ref, {
+              balance: 0,
+              tonBalance: 0,
+              puckBalance: 0 // Clean up legacy field too
+            });
+          });
+          await batch.commit();
+          WebApp.showAlert("All balances have been reset to 0.");
+        } catch (error) {
+          console.error("Error resetting balances:", error);
+          WebApp.showAlert("Failed to reset balances. Check console for details.");
+        }
+      }
+    });
   };
 
   const handleAdminTrigger = () => {
@@ -2053,7 +2204,7 @@ const App = () => {
         if (isAdmin) {
           setIsAdminPanelOpen(true);
         } else {
-          alert("Access denied: You do not have administrator privileges.");
+          WebApp.showAlert("Access denied: You do not have administrator privileges.");
         }
         return 0;
       }
@@ -2079,7 +2230,7 @@ const App = () => {
           balance: increment(amount),
           totalDeposited: increment(amount)
         });
-        alert(`Successfully deposited ${amount} DUCK!`);
+        WebApp.showAlert(`Successfully deposited ${amount} DUCK!`);
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
       }
@@ -2104,19 +2255,19 @@ const App = () => {
           await updateDoc(doc(db, 'users', user.uid), {
             balance: increment(-amount)
           });
-          alert(`Withdrawal request for ${amount} DUCK submitted!`);
+          WebApp.showAlert(`Withdrawal request for ${amount} DUCK submitted!`);
         } catch (error) {
           handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
         }
       } else {
-        alert("Insufficient balance!");
+        WebApp.showAlert("Insufficient balance!");
       }
     }
   };
 
   const handleCopyReferral = () => {
     navigator.clipboard.writeText(`t.me/GiftPhaseBot?start=${user?.uid || '6686954447'}`);
-    alert("Referral link copied to clipboard!");
+    WebApp.showAlert("Referral link copied to clipboard!");
   };
 
   const handleShare = () => {
@@ -2145,7 +2296,7 @@ const App = () => {
         clearInterval(interval);
         setTimeout(() => {
           setIsGameLoaded(true);
-          localStorage.setItem('giftphase_played', 'true');
+          safeStorage.set('giftphase_played', 'true');
           setHasPlayedBefore(true);
         }, 500);
       } else {
@@ -2157,7 +2308,7 @@ const App = () => {
   const handleLike = () => {
     const newLiked = !isLiked;
     setIsLiked(newLiked);
-    localStorage.setItem('giftphase_liked', String(newLiked));
+    safeStorage.set('giftphase_liked', String(newLiked));
     if ((window as any).Telegram?.WebApp?.HapticFeedback) {
       (window as any).Telegram.WebApp.HapticFeedback.impactOccurred('medium');
     }
@@ -2216,7 +2367,7 @@ const App = () => {
               if (!isNaN(num) && num > 10000) {
                 setCustomBid(num);
               } else {
-                alert("Invalid amount. Must be a number greater than 10,000.");
+                WebApp.showAlert("Invalid amount. Must be a number greater than 10,000.");
               }
             }
           }} 
@@ -2787,7 +2938,16 @@ const App = () => {
         .animate-crypto-slide { animation: cryptoSlide 10s linear infinite; }
       `}</style>
       <SparkleBackground />
-      {isAdminPanelOpen && <AdminPanel isAdmin={isAdmin} user={user} allTasks={allTasks} setIsAdminPanelOpen={setIsAdminPanelOpen} t={t} DuckIcon={DuckIcon} TonIcon={TonIcon} />}
+      {isAdminPanelOpen && <AdminPanel 
+        isAdmin={isAdmin} 
+        user={user} 
+        allTasks={allTasks} 
+        setIsAdminPanelOpen={setIsAdminPanelOpen} 
+        t={t} 
+        DuckIcon={DuckIcon} 
+        TonIcon={TonIcon} 
+        handleResetAllBalances={handleResetAllBalances}
+      />}
       {isFrameSelectorOpen && (
         <div className="fixed inset-0 z-[600] bg-black/80 backdrop-blur-sm flex items-end justify-center p-4">
           <div className="w-full max-w-md bg-[#0a0a0a] rounded-[40px] border border-white/10 p-8 space-y-6 animate-in slide-in-from-bottom duration-300 overflow-y-auto max-h-[85vh] no-scrollbar">
@@ -2815,7 +2975,7 @@ const App = () => {
                         <button 
                           onClick={async () => {
                             if (tonBalance < frame.price) {
-                              alert("Insufficient TON balance!");
+                              WebApp.showAlert("Insufficient TON balance!");
                               return;
                             }
                             try {
@@ -2914,7 +3074,7 @@ const App = () => {
                         onClick={async () => {
                           if (!user) return;
                           if (tonBalance < pack.price) {
-                            alert("Insufficient TON balance!");
+                            WebApp.showAlert("Insufficient TON balance!");
                             return;
                           }
                           
@@ -2931,7 +3091,7 @@ const App = () => {
                             setUserData(prev => prev ? { ...prev, hasBoughtWithTon: true } : prev);
                             
                             WebApp.HapticFeedback.notificationOccurred('success');
-                            alert(`Successfully purchased ${(pack.ducks * 1000).toLocaleString()} DUCK!`);
+                            WebApp.showAlert(`Successfully purchased ${(pack.ducks * 1000).toLocaleString()} DUCK!`);
                           } catch (e) { console.error(e); }
                         }}
                         className={`w-full py-2.5 rounded-2xl flex items-center justify-center gap-2 bg-gradient-to-b from-white to-gray-200 shadow-[0_4px_0_rgba(0,0,0,0.2)] active:translate-y-[2px] active:shadow-none transition-all akira-font`}
@@ -2956,6 +3116,43 @@ const App = () => {
           <div onClick={() => setActiveTab('profile')} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'profile' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}>
             <User size={26} />
             <span className="text-[11px] font-bold uppercase font-sans">{t.profile}</span>
+          </div>
+        </div>
+      )}
+      {showWelcomePopup && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => {}}></div>
+          <div className="relative w-full max-w-xs bg-[#111] rounded-[32px] border border-white/10 shadow-2xl flex flex-col items-center p-8 text-center animate-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-2xl flex items-center justify-center mb-6 border border-white/5">
+              <Gift size={40} className="text-cyan-400" />
+            </div>
+            
+            <h2 className="text-xl font-black text-white uppercase mb-3 leading-tight">
+              {referrerName ? (
+                <>Congratulations!<br /><span className="text-cyan-400 text-sm">You're invited by {referrerName}</span></>
+              ) : (
+                <>Welcome to GiftPhase</>
+              )}
+            </h2>
+            
+            <p className="text-white/50 text-xs font-bold uppercase tracking-wider mb-6">
+              {referrerName ? "Here's your welcome bonus!" : "Here's your welcome Bonus!"}
+            </p>
+            
+            <div className="bg-white/5 w-full py-4 rounded-2xl border border-white/5 mb-8 flex flex-col items-center">
+              <div className="flex items-center gap-2 text-3xl font-black text-white italic">
+                {formatCurrency(welcomeReward)} <DuckIcon size={28} />
+              </div>
+              <span className="text-[10px] text-white/20 font-black uppercase tracking-widest mt-1">DUCK COINS</span>
+            </div>
+            
+            <button 
+              onClick={handleClaimWelcomeBonus}
+              disabled={isClaimingWelcome}
+              className={`w-full py-4 bg-cyan-400 text-black font-black uppercase rounded-2xl shadow-[0_6px_0_#0891b2] active:translate-y-1 active:shadow-none transition-all ${isClaimingWelcome ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {isClaimingWelcome ? 'Claiming...' : 'Claim Now'}
+            </button>
           </div>
         </div>
       )}
