@@ -359,9 +359,9 @@ const ACTIVITIES = [
 const DEFAULT_AVATAR = "https://api.dicebear.com/7.x/identicon/svg?seed=User";
 
 const PROMO_BANNERS = [
-  { id: 1, title: 'WIN BIG IN ARENA', desc: 'Predict the puck & win DUCK daily!', grad: 'from-[#0891B2] to-[#2563EB]', icon: <Gamepad2 size={32} /> },
-  { id: 2, title: 'INVITE & EARN 10%', desc: 'Get rewards for every friend spending.', grad: 'from-[#E11D48] to-[#C026D3]', icon: <UserPlus size={32} /> },
-  { id: 3, title: 'TON AIRDROP', desc: 'Complete all tasks for 1M TON bonus.', grad: 'from-[#7C3AED] to-[#4F46E5]', icon: <Gift size={32} /> },
+  { id: 1, title: 'WIN BIG IN ARENA', desc: 'Predict the puck & win DUCK daily!', grad: 'from-[#0891B2] to-[#2563EB]', icon: <Gamepad2 size={32} />, action: 'arena' },
+  { id: 2, title: 'INVITE & EARN 10%', desc: 'Get rewards for every friend spending.', grad: 'from-[#E11D48] to-[#C026D3]', icon: <UserPlus size={32} />, action: 'profile' },
+  { id: 3, title: 'DUCK AIRDROP', desc: 'Complete all tasks to get 10 Million DUCK.', grad: 'from-[#7C3AED] to-[#4F46E5]', icon: <Gift size={32} />, action: 'scroll' },
 ];
 
 // --- ERROR HANDLING ---
@@ -1096,6 +1096,7 @@ const AdminPanel = ({
                         <option value="channel">Verification with Channel</option>
                         <option value="group">Verification with Group</option>
                         <option value="bot">Telegram MiniApp</option>
+                        <option value="ads">Ads Task (Adsgram)</option>
                       </>
                     )}
                   </select>
@@ -1422,6 +1423,8 @@ const App = () => {
   const [welcomeReward, setWelcomeReward] = useState(0);
   const [referrerName, setReferrerName] = useState('');
   const [isClaimingWelcome, setIsClaimingWelcome] = useState(false);
+  const [adTimers, setAdTimers] = useState<Record<string, number>>({});
+  const [adReady, setAdReady] = useState<Record<string, boolean>>({});
   const processingTasksRef = useRef<Set<string>>(new Set());
   const [hasPlayedBefore, setHasPlayedBefore] = useState(() => {
     return safeStorage.get('giftphase_played') === 'true';
@@ -2087,6 +2090,36 @@ const App = () => {
     }
   };
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setAdTimers(prev => {
+        const next = { ...prev };
+        let changed = false;
+        Object.keys(next).forEach(id => {
+          if (next[id] > 0) {
+            next[id] -= 1;
+            changed = true;
+            if (next[id] === 0) {
+              setAdReady(ready => ({ ...ready, [id]: true }));
+            }
+          }
+        });
+        return changed ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleWatchAd = (taskId) => {
+    // Adsgram integration mock
+    console.log("Watching ad for task:", taskId);
+    
+    setAdTimers(prev => ({ ...prev, [taskId]: 10 }));
+    setAdReady(prev => ({ ...prev, [taskId]: false }));
+    
+    WebApp.HapticFeedback.impactOccurred('light');
+  };
+
   const handleTaskClick = async (taskId) => {
     if (!taskId || completedTaskIds.includes(taskId) || !user || processingTasksRef.current.has(taskId)) return;
     
@@ -2600,12 +2633,25 @@ const App = () => {
         <div className="w-full px-4 pt-8 shrink-0 relative z-20">
           <div ref={promoRef} className="w-full h-44 overflow-x-auto snap-x snap-mandatory no-scrollbar flex gap-4 scroll-smooth">
             {PROMO_BANNERS.map((promo) => (
-              <div key={promo.id} className={`min-w-full h-full rounded-[36px] bg-gradient-to-br ${promo.grad} snap-center flex items-center p-8 border-t border-white/30 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden relative`}>
+              <div 
+                key={promo.id} 
+                onClick={() => {
+                  if (promo.action === 'arena') setActiveTab('arena');
+                  else if (promo.action === 'profile') setActiveTab('profile');
+                  else if (promo.action === 'scroll') {
+                    const el = document.getElementById('tasks-list');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className={`min-w-full h-full rounded-[36px] bg-gradient-to-br ${promo.grad} snap-center flex items-center p-8 border-t border-white/30 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden relative cursor-pointer active:scale-[0.98] transition-transform`}
+              >
                 <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,white_1px,transparent_1px)] bg-[length:15px_15px]"></div>
                 <div className="flex-1 flex flex-col gap-2 relative z-10">
                   <h3 className="text-2xl font-black text-white uppercase italic">{promo.title}</h3>
                   <p className="text-white/70 font-bold text-xs uppercase">{promo.desc}</p>
-                  <button className="mt-2 bg-white/20 px-4 py-1.5 rounded-full border border-white/20 text-[10px] font-black uppercase text-white">Learn More</button>
+                  <div className="mt-2 bg-white/20 px-4 py-1.5 rounded-full border border-white/20 text-[10px] font-black uppercase text-white w-fit">
+                    {promo.action === 'scroll' ? 'View Tasks' : 'Go Now'}
+                  </div>
                 </div>
                 <div className="text-white/20 relative z-10">{promo.icon}</div>
               </div>
@@ -2641,106 +2687,147 @@ const App = () => {
             );
           })}
         </div>
-        <div className="p-4 space-y-3 relative z-10">
-          {tasksToShow.map((task) => {
-            const isDone = (completedTaskIds || []).includes(task.id);
-            const isVerifying = verifyingTaskId === task.id;
-            const canClaimAchievement = task.type === 'achievement' && checkAchievementCriteria(task);
+        <div id="tasks-list" className="p-4 space-y-3 relative z-10">
+          {(() => {
+            const adsTasks = tasksToShow.filter(t => t.verificationType === 'ads');
+            const lastAdsTaskId = adsTasks.length > 0 ? adsTasks[adsTasks.length - 1].id : null;
             
-            let themeGrad = 'from-[#0891B2] to-[#2563EB]';
-            if (task.type === 'achievement') themeGrad = 'from-[#7C3AED] to-[#4F46E5]';
-            if (task.type === 'partner') themeGrad = 'from-[#E11D48] to-[#C026D3]';
-            
-            // Override with custom color if provided
-            const customStyle = task.color ? { background: `linear-gradient(to bottom, ${task.color}, ${task.color}dd)` } : {};
+            return tasksToShow.map((task) => {
+              const isDone = (completedTaskIds || []).includes(task.id);
+              const isVerifying = verifyingTaskId === task.id;
+              const canClaimAchievement = task.type === 'achievement' && checkAchievementCriteria(task);
+              const isAdsTask = task.verificationType === 'ads';
+              
+              const adTimer = adTimers[task.id] || 0;
+              const isAdReady = adReady[task.id] || false;
 
-            // Dynamic Icon Matching (Prioritized)
-            const title = (task.title || '').toLowerCase();
-            const link = (task.link || '').toLowerCase();
-            
-            let displayIcon = <Bolt size={20} />;
-            
-            if (title.includes('deposit')) {
-              displayIcon = <Wallet size={20} />;
-            } else if (link.includes('t.me')) {
-              if (link.includes('bot')) {
-                displayIcon = <Gamepad2 size={20} />;
+              let themeGrad = 'from-[#0891B2] to-[#2563EB]';
+              if (task.type === 'achievement') themeGrad = 'from-[#7C3AED] to-[#4F46E5]';
+              if (task.type === 'partner') themeGrad = 'from-[#E11D48] to-[#C026D3]';
+              if (isAdsTask) themeGrad = 'from-[#FFD700] via-[#FFA500] to-[#FF8C00]'; // Unique 3D color grading for ads
+              
+              // Override with custom color if provided
+              const customStyle = task.color ? { background: `linear-gradient(to bottom, ${task.color}, ${task.color}dd)` } : {};
+
+              // Dynamic Icon Matching (Prioritized)
+              const title = (task.title || '').toLowerCase();
+              const link = (task.link || '').toLowerCase();
+              
+              let displayIcon = <Bolt size={20} />;
+              
+              if (isAdsTask) {
+                displayIcon = <Youtube size={20} />;
+              } else if (title.includes('deposit')) {
+                displayIcon = <Wallet size={20} />;
+              } else if (link.includes('t.me')) {
+                if (link.includes('bot')) {
+                  displayIcon = <Gamepad2 size={20} />;
+                } else {
+                  displayIcon = <Send size={20} className="rotate-[-20deg]" />;
+                }
+              } else if (task.icon) {
+                const IconComp = getIcon(task.icon);
+                displayIcon = <IconComp size={20} />;
               } else {
-                displayIcon = <Send size={20} className="rotate-[-20deg]" />;
+                if (task.rewardType === 'DUCK') displayIcon = <Wallet size={20} className="text-white/80" />;
+                else if (task.type === 'achievement') displayIcon = <Gamepad2 size={20} />;
               }
-            } else if (task.icon) {
-              const IconComp = getIcon(task.icon);
-              displayIcon = <IconComp size={20} />;
-            } else {
-              if (task.rewardType === 'DUCK') displayIcon = <Wallet size={20} className="text-white/80" />;
-              else if (task.type === 'achievement') displayIcon = <Gamepad2 size={20} />;
-            }
-            
-            return (
-              <div 
-                key={task.id} 
-                className={`p-4 rounded-[28px] bg-gradient-to-b ${themeGrad} border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] flex items-center justify-between transition-all ${isDone ? 'opacity-30' : 'opacity-100'}`}
-                style={customStyle}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-2xl bg-black/20 flex items-center justify-center text-white">{displayIcon}</div>
-                  <div className="flex flex-col">
-                    <span className="text-white font-black text-[13px] uppercase truncate max-w-[140px]">{task.title}</span>
-                    <div className="flex flex-wrap items-center gap-2 text-[13px] font-black text-white akira-font">
-                      {task.duckReward > 0 && (
-                        <div className="flex items-center gap-1">
-                          <DuckIcon size={20} />
-                          <span className="leading-none">{formatCurrency(task.duckReward)}</span>
+              
+              return (
+                <React.Fragment key={task.id}>
+                  <div 
+                    className={`p-4 rounded-[28px] bg-gradient-to-b ${themeGrad} border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] flex flex-col transition-all ${isDone ? 'opacity-30' : 'opacity-100'} ${isAdsTask ? 'min-h-[140px] justify-center gap-4' : 'items-center justify-between flex-row'}`}
+                    style={customStyle}
+                  >
+                    <div className="flex items-center gap-4 w-full">
+                      <div className="w-10 h-10 rounded-2xl bg-black/20 flex items-center justify-center text-white shrink-0">{displayIcon}</div>
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <span className="text-white font-black text-[13px] uppercase truncate">{task.title}</span>
+                        <div className="flex flex-wrap items-center gap-2 text-[13px] font-black text-white akira-font">
+                          {task.duckReward > 0 && (
+                            <div className="flex items-center gap-1">
+                              <DuckIcon size={20} />
+                              <span className="leading-none">{formatCurrency(task.duckReward)}</span>
+                            </div>
+                          )}
+                          {task.tonReward > 0 && (
+                            <div className="flex items-center gap-1">
+                              <TonIcon size={20} />
+                              <span className="leading-none">{formatCurrency(task.tonReward)}</span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {task.tonReward > 0 && (
-                        <div className="flex items-center gap-1">
-                          <TonIcon size={20} />
-                          <span className="leading-none">{formatCurrency(task.tonReward)}</span>
-                        </div>
-                      )}
-                      {!task.tonReward && !task.duckReward && task.reward && (
-                        <div className="flex items-center gap-1">
-                          {task.rewardType === 'DUCK' ? <DuckIcon size={20} /> : <Zap size={10} fill="currentColor" />}
-                          <span className="leading-none">{typeof task.reward === 'number' ? formatCurrency(task.reward) : task.reward}</span>
-                        </div>
-                      )}
+                      </div>
                     </div>
+                    
+                    {isAdsTask ? (
+                      <div className="flex gap-3 w-full">
+                        <button 
+                          onClick={() => handleWatchAd(task.id)}
+                          disabled={isDone || adTimer > 0}
+                          className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-t shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none ${
+                            isDone || adTimer > 0
+                            ? 'bg-black/20 text-white/20 border-white/5 shadow-none translate-y-[2px]' 
+                            : 'bg-white text-black border-white/50'
+                          }`}
+                        >
+                          {isDone ? 'Watched' : adTimer > 0 ? `Wait ${adTimer}s` : 'Watch Now'}
+                        </button>
+                        <button 
+                          onClick={() => handleTaskClick(task.id)}
+                          disabled={isDone || !isAdReady}
+                          className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-t shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none ${
+                            isDone || !isAdReady
+                            ? 'bg-black/20 text-white/20 border-white/5 shadow-none translate-y-[2px]' 
+                            : 'bg-green-500 text-white border-white/30'
+                          }`}
+                        >
+                          Verify
+                        </button>
+                      </div>
+                    ) : (
+                      task.type === 'achievement' ? (
+                        <button 
+                          onClick={() => handleTaskAction(task)}
+                          disabled={isDone || !canClaimAchievement}
+                          className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-t ${
+                            isDone 
+                            ? 'bg-transparent text-white/20 border-white/5' 
+                            : !canClaimAchievement
+                            ? 'bg-black/20 text-white/20 border-white/5'
+                            : `bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none`
+                          }`}
+                        >
+                          {isDone ? t.completed : canClaimAchievement ? 'Claim' : `${task.requiredCount} Needed`}
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => handleTaskAction(task)}
+                          disabled={isDone}
+                          className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-t ${
+                            isDone 
+                            ? 'bg-transparent text-white/20 border-white/5' 
+                            : isVerifying
+                            ? (waitTimer > 0 ? 'bg-black/20 text-white/40 border-white/5' : 'bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)]')
+                            : `bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none`
+                          }`}
+                        >
+                          {isDone ? t.completed : isVerifying ? (waitTimer > 0 ? `Wait ${waitTimer}s` : (task.verificationType === 'channel' || task.verificationType === 'group' ? 'Check' : 'Claim')) : task.btn || 'Go'}
+                        </button>
+                      )
+                    )}
                   </div>
-                </div>
-                
-                {task.type === 'achievement' ? (
-                  <button 
-                    onClick={() => handleTaskAction(task)}
-                    disabled={isDone || !canClaimAchievement}
-                    className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-t ${
-                      isDone 
-                      ? 'bg-transparent text-white/20 border-white/5' 
-                      : !canClaimAchievement
-                      ? 'bg-black/20 text-white/20 border-white/5'
-                      : `bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none`
-                    }`}
-                  >
-                    {isDone ? t.completed : canClaimAchievement ? 'Claim' : `${task.requiredCount} Needed`}
-                  </button>
-                ) : (
-                  <button 
-                    onClick={() => handleTaskAction(task)}
-                    disabled={isDone}
-                    className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-t ${
-                      isDone 
-                      ? 'bg-transparent text-white/20 border-white/5' 
-                      : isVerifying
-                      ? (waitTimer > 0 ? 'bg-black/20 text-white/40 border-white/5' : 'bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)]')
-                      : `bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none`
-                    }`}
-                  >
-                    {isDone ? t.completed : isVerifying ? (waitTimer > 0 ? `Wait ${waitTimer}s` : (task.verificationType === 'channel' || task.verificationType === 'group' ? 'Check' : 'Claim')) : task.btn || 'Go'}
-                  </button>
-                )}
-              </div>
-            );
-          })}
+                  {isAdsTask && task.id === lastAdsTaskId && (
+                    <div className="py-2 flex items-center gap-4 opacity-30">
+                      <div className="h-[1px] flex-1 bg-white/20"></div>
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap">Free watch to Earn</span>
+                      <div className="h-[1px] flex-1 bg-white/20"></div>
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            });
+          })()}
           {tasksToShow.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 opacity-20">
               <CheckSquare size={64} />
