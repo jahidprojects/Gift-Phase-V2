@@ -651,7 +651,7 @@ const AdminPanel = ({
   );
 
   return (
-    <div className="fixed inset-0 z-[500] bg-black/95 backdrop-blur-xl flex flex-col overflow-hidden">
+    <div className="fixed inset-x-0 top-14 bottom-24 z-[500] bg-black/95 backdrop-blur-xl flex flex-col overflow-hidden rounded-t-[32px] border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
       {/* Header */}
       <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-3">
@@ -671,24 +671,23 @@ const AdminPanel = ({
       {/* Navigation Tabs */}
       <div className="flex overflow-x-auto no-scrollbar border-b border-white/10 shrink-0 bg-white/5">
         {[
-          { id: 'users', icon: <Users size={18} />, label: 'Users' },
-          { id: 'tasks', icon: <CheckSquare size={18} />, label: '' },
-          { id: 'promo', icon: <Gift size={18} />, label: 'Promo' },
-          { id: 'referral', icon: <Link size={18} />, label: 'Referral' },
-          { id: 'analytics', icon: <BarChart2 size={18} />, label: 'Stats' },
-          { id: 'withdrawal', icon: <Coins size={18} />, label: 'Offers' },
+          { id: 'users', icon: <Users size={20} /> },
+          { id: 'tasks', icon: <CheckSquare size={20} /> },
+          { id: 'promo', icon: <Gift size={20} /> },
+          { id: 'referral', icon: <Link size={20} /> },
+          { id: 'analytics', icon: <BarChart2 size={20} /> },
+          { id: 'withdrawal', icon: <Coins size={20} /> },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setAdminTab(tab.id)}
-            className={`flex items-center gap-2 px-6 py-4 border-b-2 transition-all shrink-0 ${
+            className={`flex items-center justify-center px-8 py-5 border-b-2 transition-all shrink-0 ${
               adminTab === tab.id 
               ? 'border-cyan-400 text-cyan-400 bg-cyan-400/5' 
               : 'border-transparent text-white/40 hover:text-white/60'
             }`}
           >
             {tab.icon}
-            <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
           </button>
         ))}
       </div>
@@ -2950,15 +2949,14 @@ const App = () => {
       </div>
       {isGameLoaded && (
         <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-black/85 backdrop-blur-3xl border-t border-white/5 z-[100] pb-9 flex justify-around items-center font-sans h-24">
-          <div onClick={() => setActiveTab('market')} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'market' ? 'text-[#3498db] scale-110' : 'text-[#5d666d]'}`}><Store size={26} /><span className="text-[11px] font-bold uppercase font-sans">{t.shop}</span></div>
-          <div onClick={() => setActiveTab('arena')} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'arena' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}><Gamepad2 size={26} /><span className="text-[11px] font-bold uppercase font-sans">{t.arena}</span></div>
-          <div onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'tasks' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}><ClipboardList size={26} /><span className="text-[11px] font-bold uppercase font-sans">{t.tasks}</span></div>
-          <div onClick={() => setActiveTab('rank')} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'rank' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}><Trophy size={26} /><span className="text-[11px] font-bold uppercase font-sans">{t.rank}</span></div>
-          <div onClick={() => setActiveTab('profile')} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'profile' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}>
-            <div className={`w-[38px] h-[38px] rounded-full overflow-hidden border-[2px] transition-all shadow-sm aspect-square flex items-center justify-center ${activeTab === 'profile' ? 'border-[#2563EB] grayscale-0' : 'border-white/10 grayscale opacity-50'}`}>
-              <User size={22} className={activeTab === 'profile' ? 'text-[#2563EB]' : 'text-white/20'} />
+          <div onClick={() => setActiveTab('market')} className={`flex flex-col items-center justify-center h-full cursor-pointer transition-all ${activeTab === 'market' ? 'text-[#3498db] scale-110' : 'text-[#5d666d]'}`}><Store size={28} /></div>
+          <div onClick={() => setActiveTab('arena')} className={`flex flex-col items-center justify-center h-full cursor-pointer transition-all ${activeTab === 'arena' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}><Gamepad2 size={28} /></div>
+          <div onClick={() => setActiveTab('tasks')} className={`flex flex-col items-center justify-center h-full cursor-pointer transition-all ${activeTab === 'tasks' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}><ClipboardList size={28} /></div>
+          <div onClick={() => setActiveTab('rank')} className={`flex flex-col items-center justify-center h-full cursor-pointer transition-all ${activeTab === 'rank' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}><Trophy size={28} /></div>
+          <div onClick={() => setActiveTab('profile')} className={`flex flex-col items-center justify-center h-full cursor-pointer transition-all ${activeTab === 'profile' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}>
+            <div className={`w-[42px] h-[42px] rounded-full overflow-hidden border-[2px] transition-all shadow-sm aspect-square flex items-center justify-center ${activeTab === 'profile' ? 'border-[#2563EB] grayscale-0' : 'border-white/10 grayscale opacity-50'}`}>
+              <User size={24} className={activeTab === 'profile' ? 'text-[#2563EB]' : 'text-white/20'} />
             </div>
-            <span className="text-[11px] font-bold uppercase font-sans">{t.profile}</span>
           </div>
         </div>
       )}
