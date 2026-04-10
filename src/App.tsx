@@ -2304,35 +2304,40 @@ const App = () => {
             
             if (isRich) {
               return (
-                <div key={i} className="p-4 rounded-[32px] flex items-center justify-between border border-yellow-500/30 shadow-[0_15px_40px_rgba(234,179,8,0.2)] relative overflow-hidden group transition-all hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-br from-[#1a1a1a] via-[#2a2a1a] to-[#1a1a1a]">
+                <div key={i} className="p-3.5 rounded-[24px] flex items-center justify-between border-t border-yellow-500/50 shadow-[0_5px_0_rgba(234,179,8,0.3)] relative overflow-hidden group transition-all bg-gradient-to-br from-[#1a1a1a] via-[#2a2a1a] to-[#1a1a1a] animate-gold-wave">
+                  {/* Waving Shimmer Overlay */}
+                  <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-yellow-500/10 to-transparent -translate-x-full animate-[shimmer_3s_infinite]"></div>
+                  </div>
+                  
                   {/* Golden Glow */}
                   <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ background: `radial-gradient(circle at 20% 50%, #eab308, transparent 85%)` }}></div>
                   
-                  <div className="flex items-center gap-4 relative z-10">
-                    <div className="relative">
-                      <img src={p.avatar} className="w-14 h-14 rounded-full border-2 border-yellow-500/50 object-cover shadow-[0_0_15px_rgba(234,179,8,0.3)]" alt="" referrerPolicy="no-referrer" />
-                      {isMe && <div className="absolute -top-1 -right-1 bg-cyan-400 text-black text-[8px] font-black px-2 py-0.5 rounded-full border border-black/20 shadow-lg z-20">YOU</div>}
-                      <div className="absolute -bottom-1 -right-1 bg-gradient-to-br from-yellow-300 to-yellow-600 p-1 rounded-lg shadow-lg border border-white/20 animate-pulse z-20">
-                        <Medal size={10} className="text-white" fill="currentColor" />
+                  <div className="flex items-center gap-3 relative z-10">
+                    <div className="relative shrink-0">
+                      <img src={p.avatar} className="w-11 h-11 rounded-full border-[1.5px] border-yellow-500/50 object-cover shadow-[0_0_10px_rgba(234,179,8,0.3)]" alt="" referrerPolicy="no-referrer" />
+                      {isMe && <div className="absolute -top-1 -right-1 bg-cyan-400 text-black text-[7px] font-black px-1.5 py-0.5 rounded-full border border-black/20 shadow-lg z-20">YOU</div>}
+                      <div className="absolute -bottom-1 -right-1 bg-gradient-to-br from-yellow-300 to-yellow-600 p-0.5 rounded-md shadow-lg border border-white/20 animate-pulse z-20">
+                        <Medal size={8} className="text-white" fill="currentColor" />
                       </div>
                     </div>
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[14px] font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-500 to-yellow-200 uppercase tracking-tight akira-font">{p.username}</span>
-                        <span className="text-[8px] font-black bg-yellow-500 text-black px-1.5 py-0.5 rounded-full border border-yellow-500/30 uppercase tracking-widest shadow-[0_0_10px_rgba(234,179,8,0.5)]">VIP GOLD</span>
+                    <div className="flex flex-col max-w-[110px]">
+                      <div className="flex items-center gap-1 overflow-hidden">
+                        <span className="text-[12px] font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-500 to-yellow-200 uppercase tracking-tight akira-font truncate">
+                          {p.username}
+                        </span>
+                        <span className="shrink-0 text-[7px] font-black bg-yellow-500 text-black px-1 py-0.5 rounded-md border border-yellow-500/30 uppercase tracking-tighter">VIP</span>
                       </div>
-                      <span className="text-[9px] font-bold text-yellow-500/50 uppercase tracking-[0.1em]">Elite Supporter</span>
+                      <span className="text-[8px] font-bold text-yellow-500/50 uppercase tracking-widest truncate">Elite Supporter</span>
                     </div>
                   </div>
                   
                   <div className="flex flex-col items-end relative z-10">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[18px] font-black text-white tracking-tighter">{formatCurrency(p.bet)}</span>
-                      <div className="w-5 h-5 rounded-full bg-yellow-500/10 flex items-center justify-center border border-yellow-500/20">
-                        <DuckIcon size={12} />
-                      </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[14px] font-black text-white tracking-tighter">{formatCurrency(p.bet)}</span>
+                      <DuckIcon size={12} />
                     </div>
-                    <span className="text-[9px] font-black text-yellow-500/30 uppercase tracking-widest">DUCK</span>
+                    <span className="text-[8px] font-black text-yellow-500/30 uppercase">DUCK</span>
                   </div>
                 </div>
               );
@@ -2796,6 +2801,15 @@ const App = () => {
         .fade-in { animation-name: fadeIn; }
         .animate-spin-slow { animation: spin 8s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes goldWave {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .animate-gold-wave {
+          background-size: 200% 200%;
+          animation: goldWave 6s ease infinite;
+        }
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         @keyframes coinFall { 0% { transform: translateY(-100%) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(500%) rotate(720deg); opacity: 0; } }
         @keyframes coinFloat { 
