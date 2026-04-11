@@ -22,7 +22,8 @@ import {
   arrayUnion,
   getDocFromServer,
   writeBatch,
-  getDocs
+  getDocs,
+  addDoc
 } from 'firebase/firestore';
 
 // Validate Connection to Firestore
@@ -620,6 +621,24 @@ const AdminPanel = ({
   const [selectedUserForEdit, setSelectedUserForEdit] = useState(null);
   const [selectedTaskForEdit, setSelectedTaskForEdit] = useState(null);
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description?: string;
+    type: 'input' | 'confirm' | 'alert';
+    inputValue?: string;
+    onConfirm?: (value?: string) => void;
+    confirmText?: string;
+    cancelText?: string;
+  }>({ isOpen: false, title: '', type: 'alert' });
+
+  const showModal = (config: Omit<typeof modalConfig, 'isOpen'>) => {
+    setModalConfig({ ...config, isOpen: true });
+  };
+
+  const closeModal = () => {
+    setModalConfig(prev => ({ ...prev, isOpen: false }));
+  };
   const [isAddingPromo, setIsAddingPromo] = useState(false);
   const [isAddingReferral, setIsAddingReferral] = useState(false);
   const [isAddingWithdrawal, setIsAddingWithdrawal] = useState(false);
@@ -1102,6 +1121,20 @@ const AdminPanel = ({
                   </select>
                 </div>
 
+                {selectedTaskForEdit.verificationType === 'ads' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">Reset Timer (Hours)</label>
+                    <input 
+                      type="number" 
+                      placeholder="e.g. 24 for daily reset"
+                      value={selectedTaskForEdit.resetInterval || 0}
+                      onChange={(e) => setSelectedTaskForEdit({ ...selectedTaskForEdit, resetInterval: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-sm font-black text-white focus:outline-none focus:border-rose-400/50"
+                    />
+                    <p className="text-[9px] text-white/20 px-2">Task will become available again after this many hours. Set to 0 for one-time task.</p>
+                  </div>
+                )}
+
                 {selectedTaskForEdit.type === 'achievement' && selectedTaskForEdit.verificationType !== 'none' && (
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-white/30 uppercase tracking-widest pl-2">
@@ -1147,8 +1180,11 @@ const AdminPanel = ({
                 {!isAddingTask && (
                   <button 
                     onClick={() => {
-                      WebApp.showConfirm("Delete this task?", async (confirmed) => {
-                        if (confirmed) {
+                      showModal({
+                        title: 'Delete Task?',
+                        description: 'Are you sure you want to delete this task?',
+                        type: 'confirm',
+                        onConfirm: async () => {
                           try {
                             await updateDoc(doc(db, 'tasks', selectedTaskForEdit.id), { deleted: true });
                             setSelectedTaskForEdit(null);
@@ -1165,20 +1201,32 @@ const AdminPanel = ({
                 <button 
                   onClick={async () => {
                     if (!selectedTaskForEdit.title || (!selectedTaskForEdit.duckReward && !selectedTaskForEdit.tonReward)) {
-                      WebApp.showAlert("Please fill in Title and at least one reward.");
+                      showModal({ title: 'Missing Info', description: 'Please fill in Title and at least one reward.', type: 'alert' });
                       return;
                     }
                     try {
                       const taskData = {
                         ...selectedTaskForEdit,
-                        createdAt: selectedTaskForEdit.createdAt || serverTimestamp()
+                        duckReward: Number(selectedTaskForEdit.duckReward || 0),
+                        tonReward: Number(selectedTaskForEdit.tonReward || 0),
+                        requiredCount: Number(selectedTaskForEdit.requiredCount || 0),
+                        resetInterval: Number(selectedTaskForEdit.resetInterval || 0),
+                        updatedAt: serverTimestamp()
                       };
-                      await setDoc(doc(db, 'tasks', selectedTaskForEdit.id), taskData, { merge: true });
+                      
+                      if (isAddingTask) {
+                        taskData.createdAt = serverTimestamp();
+                        taskData.completedCount = 0;
+                        await addDoc(collection(db, 'tasks'), taskData);
+                      } else {
+                        const { id, ...rest } = taskData;
+                        await updateDoc(doc(db, 'tasks', id), rest);
+                      }
+                      
                       setSelectedTaskForEdit(null);
                       WebApp.HapticFeedback.notificationOccurred('success');
                     } catch (error) {
-                      console.error("Error saving task:", error);
-                      WebApp.showAlert("Failed to save task.");
+                      handleFirestoreError(error, isAddingTask ? OperationType.CREATE : OperationType.UPDATE, 'tasks');
                     }
                   }}
                   className="flex-[2] py-5 bg-rose-400 text-black font-black uppercase rounded-[24px] flex items-center justify-center gap-2 shadow-lg active:translate-y-1 transition-all"
@@ -1394,6 +1442,7 @@ const App = () => {
   const [tonBalance, setTonBalance] = useState(0);
   const [popupTimeLeft, setPopupTimeLeft] = useState(5);
   const [completedTaskIds, setCompletedTaskIds] = useState([]);
+  const [taskCompletionTimes, setTaskCompletionTimes] = useState<Record<string, any>>({});
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
   const [isWalletConnected, setIsWalletConnected] = useState(false);
@@ -1430,6 +1479,29 @@ const App = () => {
     return safeStorage.get('giftphase_played') === 'true';
   });
 
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    description?: string;
+    type: 'alert' | 'confirm' | 'input';
+    onConfirm?: (value?: string) => void;
+    confirmText?: string;
+    cancelText?: string;
+    inputValue?: string;
+  }>({
+    isOpen: false,
+    title: '',
+    type: 'alert'
+  });
+
+  const showModal = (config: Omit<typeof modalConfig, 'isOpen'>) => {
+    setModalConfig({ ...config, isOpen: true });
+  };
+
+  const closeModal = () => {
+    setModalConfig(prev => ({ ...prev, isOpen: false }));
+  };
+
   const { walletAddress, connected, tonConnectUI } = useTonConnect();
 
   const userUnsubRef = useRef<(() => void) | null>(null);
@@ -1458,6 +1530,7 @@ const App = () => {
             setMyBalance(data.balance || 0);
             setTonBalance(data.tonBalance ?? data.puckBalance ?? 0);
             setCompletedTaskIds(data.completedTasks || []);
+            setTaskCompletionTimes(data.taskCompletionTimes || {});
             
             // Welcome Bonus Logic
             if (!data.welcomeBonusClaimed) {
@@ -2140,9 +2213,11 @@ const App = () => {
       }
       
       setCompletedTaskIds(prev => [...prev, taskId]);
+      setTaskCompletionTimes(prev => ({ ...prev, [taskId]: new Date() }));
       
       const updateData: any = {
-        completedTasks: arrayUnion(taskId)
+        completedTasks: arrayUnion(taskId),
+        [`taskCompletionTimes.${taskId}`]: serverTimestamp()
       };
       
       if (duckReward > 0) {
@@ -2206,10 +2281,13 @@ const App = () => {
     }
   };
 
-  const handleResetAllBalances = async () => {
+  const handleResetAllBalances = () => {
     if (!isAdmin) return;
-    WebApp.showConfirm("Are you sure you want to RESET ALL user balances (DUCK & TON) to 0? This cannot be undone.", async (confirmed) => {
-      if (confirmed) {
+    showModal({
+      title: 'Reset All Balances?',
+      description: 'Are you sure you want to RESET ALL user balances (DUCK & TON) to 0? This cannot be undone.',
+      type: 'confirm',
+      onConfirm: async () => {
         try {
           const usersSnap = await getDocs(collection(db, 'users'));
           const batch = writeBatch(db);
@@ -2221,10 +2299,10 @@ const App = () => {
             });
           });
           await batch.commit();
-          WebApp.showAlert("All balances have been reset to 0.");
+          showModal({ title: 'Reset Complete', description: 'All balances have been reset to 0.', type: 'alert' });
         } catch (error) {
           console.error("Error resetting balances:", error);
-          WebApp.showAlert("Failed to reset balances. Check console for details.");
+          showModal({ title: 'Error', description: 'Failed to reset balances. Check console for details.', type: 'alert' });
         }
       }
     });
@@ -2245,57 +2323,77 @@ const App = () => {
     });
   };
 
-  const handleDeposit = async () => {
-    const amount = parseFloat(prompt("Enter DUCK amount to deposit:", "10") || "0");
-    if (!isNaN(amount) && amount > 0 && user) {
-      setMyBalance(prev => prev + amount);
-      try {
-        const transId = `dep_${Date.now()}`;
-        await setDoc(doc(db, 'transactions', transId), {
-          id: transId,
-          uid: user.uid,
-          amount: amount,
-          type: 'deposit',
-          status: 'completed',
-          createdAt: serverTimestamp()
-        });
-        await updateDoc(doc(db, 'users', user.uid), {
-          balance: increment(amount),
-          totalDeposited: increment(amount)
-        });
-        WebApp.showAlert(`Successfully deposited ${amount} DUCK!`);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+  const handleDeposit = () => {
+    showModal({
+      title: 'Deposit DUCK',
+      description: 'Enter DUCK amount to deposit',
+      type: 'input',
+      inputValue: '10',
+      onConfirm: async (val) => {
+        const amount = parseFloat(val || "0");
+        if (!isNaN(amount) && amount > 0 && user) {
+          setMyBalance(prev => prev + amount);
+          try {
+            const transId = `dep_${Date.now()}`;
+            await setDoc(doc(db, 'transactions', transId), {
+              id: transId,
+              uid: user.uid,
+              amount: amount,
+              type: 'deposit',
+              status: 'completed',
+              createdAt: serverTimestamp()
+            });
+            await updateDoc(doc(db, 'users', user.uid), {
+              balance: increment(amount),
+              totalDeposited: increment(amount)
+            });
+            showModal({ title: 'Success', description: `Successfully deposited ${amount} DUCK!`, type: 'alert' });
+          } catch (error) {
+            handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+          }
+        } else {
+          showModal({ title: 'Invalid Amount', description: 'Please enter a valid amount.', type: 'alert' });
+        }
       }
-    }
+    });
   };
 
-  const handleWithdrawal = async () => {
-    const amount = parseFloat(prompt("Enter DUCK amount to withdraw:", "10") || "0");
-    if (!isNaN(amount) && amount > 0 && user) {
-      if (amount <= myBalance) {
-        setMyBalance(prev => prev - amount);
-        try {
-          const transId = `with_${Date.now()}`;
-          await setDoc(doc(db, 'transactions', transId), {
-            id: transId,
-            uid: user.uid,
-            amount: amount,
-            type: 'withdrawal',
-            status: 'pending',
-            createdAt: serverTimestamp()
-          });
-          await updateDoc(doc(db, 'users', user.uid), {
-            balance: increment(-amount)
-          });
-          WebApp.showAlert(`Withdrawal request for ${amount} DUCK submitted!`);
-        } catch (error) {
-          handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+  const handleWithdrawal = () => {
+    showModal({
+      title: 'Withdraw DUCK',
+      description: 'Enter DUCK amount to withdraw',
+      type: 'input',
+      inputValue: '10',
+      onConfirm: async (val) => {
+        const amount = parseFloat(val || "0");
+        if (!isNaN(amount) && amount > 0 && user) {
+          if (amount <= myBalance) {
+            setMyBalance(prev => prev - amount);
+            try {
+              const transId = `with_${Date.now()}`;
+              await setDoc(doc(db, 'transactions', transId), {
+                id: transId,
+                uid: user.uid,
+                amount: amount,
+                type: 'withdrawal',
+                status: 'pending',
+                createdAt: serverTimestamp()
+              });
+              await updateDoc(doc(db, 'users', user.uid), {
+                balance: increment(-amount)
+              });
+              showModal({ title: 'Success', description: `Withdrawal request for ${amount} DUCK submitted!`, type: 'alert' });
+            } catch (error) {
+              handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+            }
+          } else {
+            showModal({ title: 'Insufficient Balance', description: 'You do not have enough DUCK to withdraw this amount.', type: 'alert' });
+          }
+        } else {
+          showModal({ title: 'Invalid Amount', description: 'Please enter a valid amount.', type: 'alert' });
         }
-      } else {
-        WebApp.showAlert("Insufficient balance!");
       }
-    }
+    });
   };
 
   const handleCopyReferral = () => {
@@ -2394,15 +2492,22 @@ const App = () => {
         <button 
           disabled={isBidDisabled} 
           onClick={() => {
-            const val = prompt("Enter custom bid amount (must be more than 10,000):");
-            if (val) {
-              const num = parseInt(val.replace(/,/g, ''));
-              if (!isNaN(num) && num > 10000) {
-                setCustomBid(num);
-              } else {
-                WebApp.showAlert("Invalid amount. Must be a number greater than 10,000.");
+            showModal({
+              title: 'Custom Bid',
+              description: 'Type your DUCK amount you would like to Bid',
+              type: 'input',
+              inputValue: '',
+              onConfirm: (val) => {
+                if (val) {
+                  const num = parseInt(val.replace(/,/g, ''));
+                  if (!isNaN(num) && num > 10000) {
+                    setCustomBid(num);
+                  } else {
+                    showModal({ title: 'Invalid Amount', description: 'Must be a number greater than 10,000.', type: 'alert' });
+                  }
+                }
               }
-            }
+            });
           }} 
           className={`${premium3DStyle} w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${isBidDisabled ? 'opacity-50 grayscale' : ''}`}
         >
@@ -2525,6 +2630,38 @@ const App = () => {
     const tasksToShow = allTasks.filter(t => {
       const cat = taskCategory === 'achievements' ? 'achievement' : taskCategory === 'partners' ? 'partner' : 'daily';
       return t.type === cat && !t.deleted;
+    });
+
+    // Sort tasks: Not done first, then done
+    const sortedTasks = [...tasksToShow].sort((a, b) => {
+      const aDone = completedTaskIds.includes(a.id);
+      const bDone = completedTaskIds.includes(b.id);
+      
+      // Check for reset timers
+      const aResetInterval = a.resetInterval || 0;
+      const bResetInterval = b.resetInterval || 0;
+      
+      const aTime = taskCompletionTimes[a.id];
+      const bTime = taskCompletionTimes[b.id];
+      
+      let aActuallyDone = aDone;
+      let bActuallyDone = bDone;
+      
+      if (aDone && aResetInterval > 0 && aTime) {
+        const lastCompleted = aTime.toDate ? aTime.toDate() : new Date(aTime);
+        const hoursSince = (new Date().getTime() - lastCompleted.getTime()) / (1000 * 60 * 60);
+        if (hoursSince >= aResetInterval) aActuallyDone = false;
+      }
+      
+      if (bDone && bResetInterval > 0 && bTime) {
+        const lastCompleted = bTime.toDate ? bTime.toDate() : new Date(bTime);
+        const hoursSince = (new Date().getTime() - lastCompleted.getTime()) / (1000 * 60 * 60);
+        if (hoursSince >= bResetInterval) bActuallyDone = false;
+      }
+
+      if (aActuallyDone && !bActuallyDone) return 1;
+      if (!aActuallyDone && bActuallyDone) return -1;
+      return 0;
     });
 
     const checkAchievementCriteria = (task) => {
@@ -2689,144 +2826,163 @@ const App = () => {
         </div>
         <div id="tasks-list" className="p-4 space-y-3 relative z-10">
           {(() => {
-            const adsTasks = tasksToShow.filter(t => t.verificationType === 'ads');
-            const lastAdsTaskId = adsTasks.length > 0 ? adsTasks[adsTasks.length - 1].id : null;
+            const adsTasks = sortedTasks.filter(t => t.verificationType === 'ads');
             
-            return tasksToShow.map((task) => {
-              const isDone = (completedTaskIds || []).includes(task.id);
-              const isVerifying = verifyingTaskId === task.id;
-              const canClaimAchievement = task.type === 'achievement' && checkAchievementCriteria(task);
-              const isAdsTask = task.verificationType === 'ads';
-              
-              const adTimer = adTimers[task.id] || 0;
-              const isAdReady = adReady[task.id] || false;
-
-              let themeGrad = 'from-[#0891B2] to-[#2563EB]';
-              if (task.type === 'achievement') themeGrad = 'from-[#7C3AED] to-[#4F46E5]';
-              if (task.type === 'partner') themeGrad = 'from-[#E11D48] to-[#C026D3]';
-              if (isAdsTask) themeGrad = 'from-[#FFD700] via-[#FFA500] to-[#FF8C00]'; // Unique 3D color grading for ads
-              
-              // Override with custom color if provided
-              const customStyle = task.color ? { background: `linear-gradient(to bottom, ${task.color}, ${task.color}dd)` } : {};
-
-              // Dynamic Icon Matching (Prioritized)
-              const title = (task.title || '').toLowerCase();
-              const link = (task.link || '').toLowerCase();
-              
-              let displayIcon = <Bolt size={20} />;
-              
-              if (isAdsTask) {
-                displayIcon = <Youtube size={20} />;
-              } else if (title.includes('deposit')) {
-                displayIcon = <Wallet size={20} />;
-              } else if (link.includes('t.me')) {
-                if (link.includes('bot')) {
-                  displayIcon = <Gamepad2 size={20} />;
-                } else {
-                  displayIcon = <Send size={20} className="rotate-[-20deg]" />;
-                }
-              } else if (task.icon) {
-                const IconComp = getIcon(task.icon);
-                displayIcon = <IconComp size={20} />;
-              } else {
-                if (task.rewardType === 'DUCK') displayIcon = <Wallet size={20} className="text-white/80" />;
-                else if (task.type === 'achievement') displayIcon = <Gamepad2 size={20} />;
-              }
-              
-              return (
-                <React.Fragment key={task.id}>
-                  <div 
-                    className={`p-4 rounded-[28px] bg-gradient-to-b ${themeGrad} border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] flex flex-col transition-all ${isDone ? 'opacity-30' : 'opacity-100'} ${isAdsTask ? 'min-h-[140px] justify-center gap-4' : 'items-center justify-between flex-row'}`}
-                    style={customStyle}
-                  >
-                    <div className="flex items-center gap-4 w-full">
-                      <div className="w-10 h-10 rounded-2xl bg-black/20 flex items-center justify-center text-white shrink-0">{displayIcon}</div>
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <span className="text-white font-black text-[13px] uppercase truncate">{task.title}</span>
-                        <div className="flex flex-wrap items-center gap-2 text-[13px] font-black text-white akira-font">
-                          {task.duckReward > 0 && (
-                            <div className="flex items-center gap-1">
-                              <DuckIcon size={20} />
-                              <span className="leading-none">{formatCurrency(task.duckReward)}</span>
-                            </div>
-                          )}
-                          {task.tonReward > 0 && (
-                            <div className="flex items-center gap-1">
-                              <TonIcon size={20} />
-                              <span className="leading-none">{formatCurrency(task.tonReward)}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {isAdsTask ? (
-                      <div className="flex gap-3 w-full">
-                        <button 
-                          onClick={() => handleWatchAd(task.id)}
-                          disabled={isDone || adTimer > 0}
-                          className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-t shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none ${
-                            isDone || adTimer > 0
-                            ? 'bg-black/20 text-white/20 border-white/5 shadow-none translate-y-[2px]' 
-                            : 'bg-white text-black border-white/50'
-                          }`}
-                        >
-                          {isDone ? 'Watched' : adTimer > 0 ? `Wait ${adTimer}s` : 'Watch Now'}
-                        </button>
-                        <button 
-                          onClick={() => handleTaskClick(task.id)}
-                          disabled={isDone || !isAdReady}
-                          className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-t shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none ${
-                            isDone || !isAdReady
-                            ? 'bg-black/20 text-white/20 border-white/5 shadow-none translate-y-[2px]' 
-                            : 'bg-green-500 text-white border-white/30'
-                          }`}
-                        >
-                          Verify
-                        </button>
-                      </div>
-                    ) : (
-                      task.type === 'achievement' ? (
-                        <button 
-                          onClick={() => handleTaskAction(task)}
-                          disabled={isDone || !canClaimAchievement}
-                          className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-t ${
-                            isDone 
-                            ? 'bg-transparent text-white/20 border-white/5' 
-                            : !canClaimAchievement
-                            ? 'bg-black/20 text-white/20 border-white/5'
-                            : `bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none`
-                          }`}
-                        >
-                          {isDone ? t.completed : canClaimAchievement ? 'Claim' : `${task.requiredCount} Needed`}
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => handleTaskAction(task)}
-                          disabled={isDone}
-                          className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-t ${
-                            isDone 
-                            ? 'bg-transparent text-white/20 border-white/5' 
-                            : isVerifying
-                            ? (waitTimer > 0 ? 'bg-black/20 text-white/40 border-white/5' : 'bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)]')
-                            : `bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none`
-                          }`}
-                        >
-                          {isDone ? t.completed : isVerifying ? (waitTimer > 0 ? `Wait ${waitTimer}s` : (task.verificationType === 'channel' || task.verificationType === 'group' ? 'Check' : 'Claim')) : task.btn || 'Go'}
-                        </button>
-                      )
-                    )}
+            return (
+              <>
+                {adsTasks.length > 0 && (
+                  <div className="py-2 flex items-center gap-4 opacity-30 animate-in fade-in duration-500">
+                    <div className="h-[1px] flex-1 bg-white/20"></div>
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap">Free watch to Earn</span>
+                    <div className="h-[1px] flex-1 bg-white/20"></div>
                   </div>
-                  {isAdsTask && task.id === lastAdsTaskId && (
-                    <div className="py-2 flex items-center gap-4 opacity-30">
-                      <div className="h-[1px] flex-1 bg-white/20"></div>
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap">Free watch to Earn</span>
-                      <div className="h-[1px] flex-1 bg-white/20"></div>
-                    </div>
-                  )}
-                </React.Fragment>
-              );
-            });
+                )}
+                {sortedTasks.map((task) => {
+                  const isDoneInState = (completedTaskIds || []).includes(task.id);
+                  const resetInterval = task.resetInterval || 0;
+                  const completionTime = taskCompletionTimes[task.id];
+                  
+                  let isDone = isDoneInState;
+                  if (isDoneInState && resetInterval > 0 && completionTime) {
+                    const lastCompleted = completionTime.toDate ? completionTime.toDate() : new Date(completionTime);
+                    const hoursSince = (new Date().getTime() - lastCompleted.getTime()) / (1000 * 60 * 60);
+                    if (hoursSince >= resetInterval) isDone = false;
+                  }
+
+                  const isVerifying = verifyingTaskId === task.id;
+                  const canClaimAchievement = task.type === 'achievement' && checkAchievementCriteria(task);
+                  const isAdsTask = task.verificationType === 'ads';
+                  
+                  const adTimer = adTimers[task.id] || 0;
+                  const isAdReady = adReady[task.id] || false;
+
+                  let themeGrad = 'from-[#0891B2] to-[#2563EB]';
+                  if (task.type === 'achievement') themeGrad = 'from-[#7C3AED] to-[#4F46E5]';
+                  if (task.type === 'partner') themeGrad = 'from-[#E11D48] to-[#C026D3]';
+                  if (isAdsTask) themeGrad = 'from-[#FFD700] via-[#FFA500] to-[#FF8C00]'; // Unique 3D color grading for ads
+                  
+                  // Override with custom color if provided
+                  const customStyle = task.color ? { background: `linear-gradient(to bottom, ${task.color}, ${task.color}dd)` } : {};
+
+                  // Dynamic Icon Matching (Prioritized)
+                  const title = (task.title || '').toLowerCase();
+                  const link = (task.link || '').toLowerCase();
+                  
+                  let displayIcon = <Bolt size={20} />;
+                  
+                  if (isAdsTask) {
+                    displayIcon = <Youtube size={20} />;
+                  } else if (title.includes('deposit')) {
+                    displayIcon = <Wallet size={20} />;
+                  } else if (link.includes('t.me')) {
+                    if (link.includes('bot')) {
+                      displayIcon = <Gamepad2 size={20} />;
+                    } else {
+                      displayIcon = <Send size={20} className="rotate-[-20deg]" />;
+                    }
+                  } else if (task.icon) {
+                    const IconComp = getIcon(task.icon);
+                    displayIcon = <IconComp size={20} />;
+                  } else {
+                    if (task.rewardType === 'DUCK') displayIcon = <Wallet size={20} className="text-white/80" />;
+                    else if (task.type === 'achievement') displayIcon = <Gamepad2 size={20} />;
+                  }
+                  
+                  return (
+                    <React.Fragment key={task.id}>
+                      <div 
+                        className={`p-4 rounded-[28px] bg-gradient-to-b ${themeGrad} border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] flex flex-col transition-all ${isDone ? 'opacity-[0.15]' : 'opacity-100'} ${isAdsTask ? 'min-h-[140px] justify-center gap-4' : 'items-center justify-between flex-row'}`}
+                        style={customStyle}
+                      >
+                        <div className="flex items-center gap-4 w-full">
+                          <div className="w-10 h-10 rounded-2xl bg-black/20 flex items-center justify-center text-white shrink-0">{displayIcon}</div>
+                          <div className="flex flex-col flex-1 min-w-0">
+                            <span className="text-white font-black text-[13px] uppercase truncate">{task.title}</span>
+                            <div className="flex flex-wrap items-center gap-2 text-[13px] font-black text-white akira-font">
+                              {task.duckReward > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <DuckIcon size={20} />
+                                  <span className="leading-none">{formatCurrency(task.duckReward)}</span>
+                                </div>
+                              )}
+                              {task.tonReward > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <TonIcon size={20} />
+                                  <span className="leading-none">{formatCurrency(task.tonReward)}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {isAdsTask ? (
+                          <div className="flex gap-3 w-full">
+                            <button 
+                              onClick={() => handleWatchAd(task.id)}
+                              disabled={isDone || adTimer > 0}
+                              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-t shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none ${
+                                isDone || adTimer > 0
+                                ? 'bg-black/20 text-white/20 border-white/5 shadow-none translate-y-[2px]' 
+                                : 'bg-white text-black border-white/50'
+                              }`}
+                            >
+                              {isDone ? 'Watched' : adTimer > 0 ? `Wait ${adTimer}s` : 'Watch Now'}
+                            </button>
+                            <button 
+                              onClick={() => handleTaskClick(task.id)}
+                              disabled={isDone || !isAdReady}
+                              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all border-t shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none ${
+                                isDone || !isAdReady
+                                ? 'bg-black/20 text-white/20 border-white/5 shadow-none translate-y-[2px]' 
+                                : 'bg-green-500 text-white border-white/30'
+                              }`}
+                            >
+                              Verify
+                            </button>
+                          </div>
+                        ) : (
+                          task.type === 'achievement' ? (
+                            <button 
+                              onClick={() => handleTaskAction(task)}
+                              disabled={isDone || !canClaimAchievement}
+                              className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-t ${
+                                isDone 
+                                ? 'bg-transparent text-white/20 border-white/5' 
+                                : !canClaimAchievement
+                                ? 'bg-black/20 text-white/20 border-white/5'
+                                : `bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none`
+                              }`}
+                            >
+                              {isDone ? t.completed : canClaimAchievement ? 'Claim' : `${task.requiredCount} Needed`}
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => {
+                                if (isDone && task.link) {
+                                  if (task.verificationType === 'channel' || task.verificationType === 'group') WebApp.openTelegramLink(task.link);
+                                  else WebApp.openLink(task.link);
+                                } else {
+                                  handleTaskAction(task);
+                                }
+                              }}
+                              className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border-t ${
+                                isDone 
+                                ? 'bg-white/10 text-white/40 border-white/5 active:translate-y-[1px]' 
+                                : isVerifying
+                                ? (waitTimer > 0 ? 'bg-black/20 text-white/40 border-white/5' : 'bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)]')
+                                : `bg-white text-black border-white/50 shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-[2px] active:shadow-none`
+                              }`}
+                            >
+                              {isDone ? 'Go' : isVerifying ? (waitTimer > 0 ? `Wait ${waitTimer}s` : (task.verificationType === 'channel' || task.verificationType === 'group' ? 'Check' : 'Claim')) : task.btn || 'Go'}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              </>
+            );
           })()}
           {tasksToShow.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 opacity-20">
@@ -3035,6 +3191,50 @@ const App = () => {
         TonIcon={TonIcon} 
         handleResetAllBalances={handleResetAllBalances}
       />}
+
+      {modalConfig.isOpen && (
+        <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-[#0a0a0a] rounded-[40px] border border-white/10 p-8 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="text-center space-y-2">
+              <h3 className="text-2xl font-black text-white uppercase italic tracking-tight">{modalConfig.title}</h3>
+              {modalConfig.description && <p className="text-white/40 text-xs font-bold uppercase tracking-widest leading-relaxed">{modalConfig.description}</p>}
+            </div>
+
+            {modalConfig.type === 'input' && (
+              <div className="relative">
+                <input 
+                  type="text"
+                  autoFocus
+                  value={modalConfig.inputValue || ''}
+                  onChange={(e) => setModalConfig({ ...modalConfig, inputValue: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 px-6 text-lg font-black text-white focus:outline-none focus:border-cyan-400/50 text-center"
+                  placeholder="0"
+                />
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => {
+                  if (modalConfig.onConfirm) modalConfig.onConfirm(modalConfig.inputValue);
+                  closeModal();
+                }}
+                className={`w-full py-5 rounded-[24px] font-black text-sm uppercase tracking-widest border-t border-white/30 shadow-[0_6px_0_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-[0_2px_0_rgba(0,0,0,0.4)] transition-all ${modalConfig.type === 'confirm' || modalConfig.type === 'input' ? 'bg-gradient-to-b from-cyan-400 to-cyan-600 text-black' : 'bg-white text-black'}`}
+              >
+                {modalConfig.confirmText || (modalConfig.type === 'confirm' ? 'Confirm' : modalConfig.type === 'input' ? 'Continue' : 'OK')}
+              </button>
+              {(modalConfig.type === 'confirm' || modalConfig.type === 'input') && (
+                <button 
+                  onClick={closeModal}
+                  className="w-full py-4 text-white/30 font-black text-[10px] uppercase tracking-widest hover:text-white transition-colors"
+                >
+                  {modalConfig.cancelText || 'Cancel'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {isFrameSelectorOpen && (
         <div className="fixed inset-0 z-[600] bg-black/80 backdrop-blur-sm flex items-end justify-center p-4">
           <div className="w-full max-w-md bg-[#0a0a0a] rounded-[40px] border border-white/10 p-8 space-y-6 animate-in slide-in-from-bottom duration-300 overflow-y-auto max-h-[85vh] no-scrollbar">
