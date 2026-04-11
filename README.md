@@ -29,13 +29,6 @@ A dual-currency economy featuring **DUCK** and **TON**:
 ### 🏆 Competitive Leaderboard
 Real-time rankings showing the top players in the ecosystem. Compete for the top spot and earn prestige within the community.
 
-### 🛠️ Robust Admin Panel
-A comprehensive management suite for administrators:
-- **Task Editor:** Create and edit tasks with custom icons, rewards, and reset intervals (Hours or Seconds).
-- **Promo Management:** Update the home screen banners in real-time.
-- **Economy Control:** Reset balances, manage custom bids, and monitor system health.
-- **Security:** Protected routes and actions to ensure ecosystem integrity.
-
 ---
 
 ## 🛠️ Tech Stack
