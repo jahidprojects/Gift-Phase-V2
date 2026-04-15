@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, memo, Component, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import WebApp from '@twa-dev/sdk';
 import { useTonConnect } from './hooks/useTonConnect';
 import { auth, db } from './firebase';
@@ -3653,13 +3654,20 @@ const App = () => {
                   onClick={() => { setActiveTab(tab.id as any); setIsAdminPanelOpen(false); }} 
                   className={`relative flex items-center justify-center cursor-pointer transition-all duration-500 ease-in-out
                     ${isActive 
-                      ? 'flex-[2] h-[50px] bg-transparent border-[1.5px] border-white rounded-full mx-0.5' 
-                      : 'flex-1 h-[44px] max-w-[44px] bg-[#1a1a1a] rounded-full mx-0.5'
+                      ? 'flex-[2] h-[50px] mx-0.5' 
+                      : 'flex-1 h-[44px] max-w-[44px] mx-0.5'
                     }`}
                 >
+                  {isActive && (
+                    <motion.div 
+                      layoutId="nav-selection"
+                      className="absolute inset-0 bg-gradient-to-br from-[#2563EB] to-[#1E40AF] border-[1.5px] border-white rounded-full z-0 shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    />
+                  )}
                   <Icon 
                     size={isActive ? 24 : 20} 
-                    className={`transition-all duration-300 ${isActive ? 'text-white' : 'text-[#666]'}`} 
+                    className={`relative z-10 transition-all duration-300 ${isActive ? 'text-white' : 'text-[#666]'}`} 
                   />
                 </div>
               );
