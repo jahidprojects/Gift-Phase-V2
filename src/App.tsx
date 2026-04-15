@@ -107,6 +107,50 @@ const PLAYER_PALETTE = [
   { main: '#4F46E5', light: '#BCC3FF', accent: '#DEE1FF' },
 ];
 
+const MINER_TYPES = [
+  {
+    id: 'plush_pepe',
+    name: 'PLUSH PEPE',
+    image: 'https://i.ibb.co/KxLhYKxW/Picsart-26-04-09-21-58-38-017.png',
+    priceTon: 10,
+    baseDuckPerHour: 1000000,
+    maxLevel: 51,
+    maxTonLifetime: 20,
+    totalTonMining: 10,
+    baseMiningPeriodDays: 1095,
+    maxClaims: 365,
+  }
+];
+
+const calculateMinerStats = (level: number) => {
+  const miner = MINER_TYPES[0];
+  const multiplier = 1 + (level * 0.1);
+  const duckPerHour = miner.baseDuckPerHour * multiplier;
+  const capacityHours = 2 + (level * (22 / 51));
+  const boosterCooldownHours = 4 + (level * (20 / 51));
+  const miningPeriodDays = miner.baseMiningPeriodDays - (level * 10);
+  const tonPerDay = miner.totalTonMining / miningPeriodDays;
+  
+  return {
+    duckPerHour,
+    capacityHours,
+    boosterCooldownHours,
+    tonPerDay,
+    multiplier,
+    miningPeriodDays
+  };
+};
+
+const getUpgradeCost = (level: number) => {
+  const baseDuck = 100000;
+  const baseTon = 0.1;
+  const factor = Math.pow(1.5, level);
+  return {
+    duck: Math.floor(baseDuck * factor),
+    ton: baseTon * factor
+  };
+};
+
 const DuckIcon = ({ size = 16, className = "" }) => (
   <div 
     style={{ 
@@ -634,6 +678,7 @@ const AdminPanel = ({
     type: 'input' | 'confirm' | 'alert';
     inputValue?: string;
     onConfirm?: (value?: string) => void;
+    onCancel?: () => void;
     confirmText?: string;
     cancelText?: string;
   }>({ isOpen: false, title: '', type: 'alert' });
@@ -2529,37 +2574,108 @@ const App = () => {
   };
 
   const renderHome = () => {
-    const miningData = {
-      lastClaim: userData?.miningLastClaim?.toDate ? userData.miningLastClaim.toDate() : (userData?.miningLastClaim ? new Date(userData.miningLastClaim) : new Date(userData?.createdAt?.toDate ? userData.createdAt.toDate() : Date.now())),
-      rate: userData?.miningRate || 1000,
-      capacity: userData?.miningCapacity || 12,
-      boost: userData?.miningBoost || 1,
-      speed: userData?.miningSpeed || 1,
-    };
-
+    const miner = MINER_TYPES[0];
+    const userMiner = userData?.miners?.[miner.id];
+    const hasMiner = !!userMiner;
+    
+    const stats = calculateMinerStats(userMiner?.level || 0);
     const now = currentTime;
-    const last = miningData.lastClaim.getTime();
-    const diffHours = (now - last) / (1000 * 60 * 60);
-    const cappedHours = Math.min(diffHours, miningData.capacity);
-    const accumulated = cappedHours * miningData.rate * miningData.speed * miningData.boost;
-
-    const capacityMs = miningData.capacity * 60 * 60 * 1000;
-    const remainingMs = Math.max(0, (last + capacityMs) - now);
-    const countdown = formatCountdown(remainingMs);
-    const isMiningFinished = remainingMs <= 0;
+    
+    // Mining Logic
+    const lastClaim = userMiner?.lastClaimAt || userMiner?.purchasedAt || 0;
+    const elapsedMs = now - lastClaim;
+    const elapsedHours = elapsedMs / (1000 * 60 * 60);
+    
+    // Capacity check
+    const effectiveHours = Math.min(elapsedHours, stats.capacityHours);
+    
+    // Boost check
+    const isBoosting = userMiner?.boostStartedAt && (now - userMiner.boostStartedAt < 30 * 60 * 1000);
+    const boostMultiplier = isBoosting ? 2 : 1;
+    
+    const accumulatedDuck = Math.floor(effectiveHours * stats.duckPerHour * boostMultiplier);
+    const accumulatedTon = effectiveHours * (stats.tonPerDay / 24);
+    
+    const isMiningFinished = userMiner?.claimsCount >= miner.maxClaims;
+    const nextClaimAvailableAt = lastClaim + (24 * 60 * 60 * 1000);
+    const canClaim = now >= nextClaimAvailableAt && !isMiningFinished && hasMiner;
+    
+    const timeUntilNextClaim = Math.max(0, nextClaimAvailableAt - now);
+    
+    // Booster Cooldown
+    const lastBoost = userMiner?.lastBoostAt || 0;
+    const boosterCooldownMs = stats.boosterCooldownHours * 60 * 60 * 1000;
+    const nextBoostAvailableAt = lastBoost + boosterCooldownMs;
+    const canBoost = now >= nextBoostAvailableAt && hasMiner && !isBoosting;
+    const timeUntilNextBoost = Math.max(0, nextBoostAvailableAt - now);
 
     const handleClaimMining = async () => {
-      if (!user || accumulated <= 0) return;
+      if (!user || !hasMiner || !canClaim) return;
       try {
         const userRef = doc(db, 'users', user.uid);
         await updateDoc(userRef, {
-          balance: increment(accumulated),
-          miningLastClaim: serverTimestamp()
+          balance: increment(accumulatedDuck),
+          tonBalance: increment(accumulatedTon),
+          [`miners.${miner.id}.lastClaimAt`]: now,
+          [`miners.${miner.id}.claimsCount`]: increment(1),
+          [`miners.${miner.id}.totalDuckEarned`]: increment(accumulatedDuck),
+          [`miners.${miner.id}.totalTonEarned`]: increment(accumulatedTon),
         });
-        setMyBalance(prev => prev + accumulated);
+        setMyBalance(prev => prev + accumulatedDuck);
+        setTonBalance(prev => prev + accumulatedTon);
         WebApp.HapticFeedback.notificationOccurred('success');
+        WebApp.showAlert(`Successfully claimed ${formatCurrency(accumulatedDuck)} DUCK and ${accumulatedTon.toFixed(4)} TON!`);
       } catch (e) {
         console.error("Error claiming mining:", e);
+      }
+    };
+
+    const handleBoost = async () => {
+      if (!user || !hasMiner || !canBoost) return;
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, {
+          [`miners.${miner.id}.lastBoostAt`]: now,
+          [`miners.${miner.id}.boostStartedAt`]: now,
+        });
+        WebApp.HapticFeedback.notificationOccurred('success');
+        WebApp.showAlert("2X Boost activated for 30 minutes!");
+      } catch (e) {
+        console.error("Error boosting:", e);
+      }
+    };
+
+    const handleUpgrade = async (currency: 'duck' | 'ton') => {
+      if (!user || !hasMiner) return;
+      const currentLevel = userMiner.level;
+      if (currentLevel >= miner.maxLevel) {
+        WebApp.showAlert("Maximum level reached!");
+        return;
+      }
+      
+      const cost = getUpgradeCost(currentLevel);
+      if (currency === 'duck' && myBalance < cost.duck) {
+        WebApp.showAlert("Insufficient DUCK balance!");
+        return;
+      }
+      if (currency === 'ton' && tonBalance < cost.ton) {
+        WebApp.showAlert("Insufficient TON balance!");
+        return;
+      }
+
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, {
+          balance: currency === 'duck' ? increment(-cost.duck) : increment(0),
+          tonBalance: currency === 'ton' ? increment(-cost.ton) : increment(0),
+          [`miners.${miner.id}.level`]: increment(1),
+        });
+        if (currency === 'duck') setMyBalance(prev => prev - cost.duck);
+        if (currency === 'ton') setTonBalance(prev => prev - cost.ton);
+        WebApp.HapticFeedback.notificationOccurred('success');
+        WebApp.showAlert(`Upgraded to Level ${currentLevel + 1}!`);
+      } catch (e) {
+        console.error("Error upgrading:", e);
       }
     };
 
@@ -2587,12 +2703,12 @@ const App = () => {
         {/* Mining Machine */}
         <div className="px-4 mb-6">
           <div className="relative aspect-square rounded-[44px] overflow-hidden border-[6px] border-[#1a1a1a] bg-gradient-to-br from-[#111] to-[#222] shadow-2xl flex flex-col items-center justify-center p-8">
-            <div className="absolute top-6 text-cyan-400 font-black text-xs uppercase tracking-[0.3em] akira-font">PLUSH PEPE</div>
+            <div className="absolute top-6 text-cyan-400 font-black text-xs uppercase tracking-[0.3em] akira-font">{miner.name}</div>
             
             <div className="relative group">
               <div className="absolute -inset-10 bg-cyan-500/20 blur-3xl rounded-full animate-pulse"></div>
               <img 
-                src="https://picsum.photos/seed/gift/400/400" 
+                src={miner.image} 
                 alt="Gift" 
                 className="w-48 h-48 object-contain relative z-10 drop-shadow-[0_0_20px_rgba(0,255,255,0.3)]"
                 referrerPolicy="no-referrer"
@@ -2600,13 +2716,17 @@ const App = () => {
             </div>
 
             <div className="absolute bottom-10 flex flex-col items-center">
-              <div className="text-white/40 text-[10px] font-black uppercase tracking-widest mb-1">Mining Status</div>
+              <div className="text-white/40 text-[10px] font-black uppercase tracking-widest mb-1">
+                {isMiningFinished ? "MINING COMPLETED" : !hasMiner ? "NOT PURCHASED" : "Mining Status"}
+              </div>
               <div className="text-2xl font-black text-white akira-font tracking-tighter">
-                {isMiningFinished ? "FINISHED" : countdown}
+                {isMiningFinished ? "365/365" : !hasMiner ? "SHOP" : formatCountdown(timeUntilNextClaim)}
               </div>
-              <div className="text-cyan-400/60 text-[8px] font-black uppercase tracking-[0.2em] mt-1">
-                {miningData.rate.toLocaleString()} DUCK / HOUR
-              </div>
+              {hasMiner && (
+                <div className="text-cyan-400/60 text-[8px] font-black uppercase tracking-[0.2em] mt-1">
+                  {stats.duckPerHour.toLocaleString()} DUCK / HOUR
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2615,40 +2735,59 @@ const App = () => {
         <div className="px-4 grid grid-cols-2 gap-4 mb-6">
           <button 
             onClick={handleClaimMining}
-            disabled={accumulated <= 0}
-            className={`h-16 rounded-[24px] flex flex-col items-center justify-center gap-0.5 border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-none transition-all ${accumulated > 0 ? 'bg-gradient-to-b from-green-500 to-green-700' : 'bg-gray-800 opacity-50 grayscale'}`}
+            disabled={!canClaim}
+            className={`h-16 rounded-[24px] flex flex-col items-center justify-center gap-0.5 border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-none transition-all ${canClaim ? 'bg-gradient-to-b from-green-500 to-green-700' : 'bg-gray-800 opacity-50 grayscale'}`}
           >
             <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">Claim</span>
             <div className="flex items-center gap-1">
-              <span className="text-sm font-black text-white akira-font">{formatCurrency(accumulated)}</span>
+              <span className="text-sm font-black text-white akira-font">{formatCurrency(accumulatedDuck)}</span>
               <DuckIcon size={16} />
             </div>
           </button>
           <button 
+            onClick={() => {
+              const cost = getUpgradeCost(userMiner?.level || 0);
+              showModal({
+                title: 'Upgrade Miner',
+                description: `Upgrade to Level ${(userMiner?.level || 0) + 1} for ${formatCurrency(cost.duck)} DUCK or ${cost.ton.toFixed(2)} TON?`,
+                type: 'confirm',
+                confirmText: 'DUCK',
+                cancelText: 'TON',
+                onConfirm: () => handleUpgrade('duck'),
+                onCancel: () => handleUpgrade('ton')
+              });
+            }}
+            disabled={!hasMiner || userMiner?.level >= miner.maxLevel}
             className="h-16 rounded-[24px] flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-blue-500 to-blue-700 border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-none transition-all"
           >
             <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">Upgrade</span>
-            <span className="text-sm font-black text-white akira-font">LEVEL {userData?.miningLevel || 1}</span>
+            <span className="text-sm font-black text-white akira-font">LEVEL {userMiner?.level || 0}</span>
           </button>
         </div>
 
         {/* Stats Buttons */}
         <div className="px-4 grid grid-cols-3 gap-3">
-          <button className="py-4 rounded-[20px] bg-[#1a1a1a] border border-white/5 flex flex-col items-center gap-1 shadow-lg active:scale-95 transition-all">
+          <div className="py-4 rounded-[20px] bg-[#1a1a1a] border border-white/5 flex flex-col items-center gap-1 shadow-lg">
             <ArrowUpCircle size={20} className="text-cyan-400" />
             <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Capacity</span>
-            <span className="text-[10px] font-black text-white akira-font">{miningData.capacity}H</span>
-          </button>
-          <button className="py-4 rounded-[20px] bg-[#1a1a1a] border border-white/5 flex flex-col items-center gap-1 shadow-lg active:scale-95 transition-all">
-            <Zap size={20} className="text-yellow-400" />
+            <span className="text-[10px] font-black text-white akira-font">{stats.capacityHours.toFixed(1)}H</span>
+          </div>
+          <button 
+            onClick={handleBoost}
+            disabled={!canBoost}
+            className={`py-4 rounded-[20px] bg-[#1a1a1a] border border-white/5 flex flex-col items-center gap-1 shadow-lg active:scale-95 transition-all ${!canBoost ? 'opacity-50 grayscale' : ''}`}
+          >
+            <Zap size={20} className={isBoosting ? "text-yellow-400 animate-pulse" : "text-yellow-400"} />
             <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Boost</span>
-            <span className="text-[10px] font-black text-white akira-font">X{miningData.boost}</span>
+            <span className="text-[10px] font-black text-white akira-font">
+              {isBoosting ? "ACTIVE" : canBoost ? "READY" : formatCountdown(timeUntilNextBoost)}
+            </span>
           </button>
-          <button className="py-4 rounded-[20px] bg-[#1a1a1a] border border-white/5 flex flex-col items-center gap-1 shadow-lg active:scale-95 transition-all">
+          <div className="py-4 rounded-[20px] bg-[#1a1a1a] border border-white/5 flex flex-col items-center gap-1 shadow-lg">
             <Bolt size={20} className="text-green-400" />
             <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Speed</span>
-            <span className="text-[10px] font-black text-white akira-font">X{miningData.speed}</span>
-          </button>
+            <span className="text-[10px] font-black text-white akira-font">X{stats.multiplier.toFixed(1)}</span>
+          </div>
         </div>
       </div>
     );
@@ -3465,7 +3604,10 @@ const App = () => {
               </button>
               {(modalConfig.type === 'confirm' || modalConfig.type === 'input') && (
                 <button 
-                  onClick={closeModal}
+                  onClick={() => {
+                    if (modalConfig.onCancel) modalConfig.onCancel();
+                    closeModal();
+                  }}
                   className="w-full py-4 text-white/30 font-black text-[10px] uppercase tracking-widest hover:text-white transition-colors"
                 >
                   {modalConfig.cancelText || 'Cancel'}
@@ -3562,46 +3704,66 @@ const App = () => {
           <div className="flex-1 flex flex-col p-6 relative z-10 overflow-y-auto no-scrollbar pb-40 pt-16">
             <div className="flex flex-col items-center mb-10 pt-8">
               <div className="bg-[#E91E63] px-8 py-2 rounded-lg shadow-[0_4px_0_#AD1457] border-2 border-[#FFD54F] mb-4 transform -skew-x-12">
-                <h1 className="text-xl font-black text-white uppercase italic tracking-wider skew-x-12">VIP PACKS</h1>
+                <h1 className="text-xl font-black text-white uppercase italic tracking-wider skew-x-12">GIFT MINERS</h1>
               </div>
-              <p className="text-white/60 text-[10px] font-bold uppercase tracking-[0.2em]">Exclusive Rewards & Frames</p>
+              <p className="text-white/60 text-[10px] font-bold uppercase tracking-[0.2em]">Purchase & Upgrade Gifts</p>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { id: 'pack_1', ducks: 100, price: 1, color: '#F3BA2F' },
-                { id: 'pack_2', ducks: 205, price: 2, color: '#14F195' },
-                { id: 'pack_3', ducks: 310, price: 3, color: '#FFD700' },
-                { id: 'pack_4', ducks: 515, price: 5, color: '#627EEA' },
-                { id: 'pack_5', ducks: 1000, price: 8.99, color: '#F7931A' },
-              ].map(pack => (
-                <div key={pack.id} className="relative group">
-                  <div className="absolute -inset-0.5 bg-gradient-to-b from-white/20 to-transparent rounded-[24px] blur-[1px]"></div>
-                  <div className="relative h-full bg-gradient-to-b from-[#1e293b] to-[#0f172a] rounded-[24px] border-2 border-white/10 p-4 flex flex-col items-center shadow-2xl overflow-hidden min-h-[200px]">
-                    {/* Radial Burst Background */}
-                    <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,white_0%,transparent_70%)]"></div>
-                    
-                    <div className="flex flex-col items-center mb-2 relative z-10 w-full">
-                      <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">DUCK PACK</span>
-                    </div>
-
-                    <div className="flex-1 flex flex-col items-center justify-center relative z-10 w-full py-4">
-                      <div className="relative flex flex-col items-center">
-                        <div className="absolute -inset-8 bg-yellow-400/20 blur-2xl rounded-full"></div>
-                        <DuckIcon size={48} className="mb-3" />
-                        <div className="flex flex-col items-center">
-                          <span className="text-2xl font-black text-white tracking-tighter leading-none akira-font">
-                            {(pack.ducks * 1000).toLocaleString()}
-                          </span>
+            <div className="space-y-6">
+              {MINER_TYPES.map(miner => {
+                const isOwned = !!userData?.miners?.[miner.id];
+                return (
+                  <div key={miner.id} className="relative group">
+                    <div className="absolute -inset-0.5 bg-gradient-to-b from-white/20 to-transparent rounded-[32px] blur-[1px]"></div>
+                    <div className="relative bg-gradient-to-b from-[#1e293b] to-[#0f172a] rounded-[32px] border-2 border-white/10 p-6 flex flex-col shadow-2xl overflow-hidden">
+                      {/* Radial Burst Background */}
+                      <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,white_0%,transparent_70%)]"></div>
+                      
+                      <div className="flex items-start gap-6 relative z-10 mb-6">
+                        <div className="w-32 h-32 bg-black/40 rounded-3xl flex items-center justify-center p-4 border border-white/5 shadow-inner">
+                          <img src={miner.image} className="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" alt={miner.name} referrerPolicy="no-referrer" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-xl font-black text-white akira-font mb-1">{miner.name}</h3>
+                          <div className="flex items-center gap-2 mb-4">
+                            <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-[8px] font-black rounded uppercase tracking-widest border border-cyan-500/30">Miner</span>
+                            {isOwned && <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-[8px] font-black rounded uppercase tracking-widest border border-green-500/30">Owned</span>}
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-white/40">
+                              <span>Claims</span>
+                              <span className="text-white">365 Days</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-white/40">
+                              <span>Upgrade Cycle</span>
+                              <span className="text-white">51 Max</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-white/40">
+                              <span>Multiplier</span>
+                              <span className="text-white">Up to 6.1x</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="w-full relative z-10">
+                      <div className="grid grid-cols-2 gap-3 mb-6 relative z-10">
+                        <div className="bg-black/20 p-3 rounded-2xl border border-white/5">
+                          <div className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1">Max DUCK / 24h</div>
+                          <div className="text-xs font-black text-white akira-font">100M+</div>
+                        </div>
+                        <div className="bg-black/20 p-3 rounded-2xl border border-white/5">
+                          <div className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1">Max TON Lifetime</div>
+                          <div className="text-xs font-black text-white akira-font">20 TON</div>
+                        </div>
+                      </div>
+
                       <button 
+                        disabled={isOwned}
                         onClick={async () => {
                           if (!user) return;
-                          if (tonBalance < pack.price) {
+                          if (isOwned) return;
+                          if (tonBalance < miner.priceTon) {
                             WebApp.showAlert("Insufficient TON balance!");
                             return;
                           }
@@ -3609,35 +3771,50 @@ const App = () => {
                           try {
                             const userRef = doc(db, 'users', user.uid);
                             await updateDoc(userRef, {
-                              tonBalance: increment(-pack.price),
-                              balance: increment(pack.ducks * 1000),
-                              shopPurchases: arrayUnion(`${(pack.ducks * 1000).toLocaleString()} DUCK PACK`),
-                              hasBoughtWithTon: true
+                              tonBalance: increment(-miner.priceTon),
+                              [`miners.${miner.id}`]: {
+                                level: 0,
+                                purchasedAt: Date.now(),
+                                lastClaimAt: Date.now(),
+                                lastBoostAt: 0,
+                                claimsCount: 0,
+                                totalDuckEarned: 0,
+                                totalTonEarned: 0,
+                                miningStartedAt: Date.now(),
+                                isBoosting: false,
+                                boostStartedAt: 0
+                              }
                             });
-                            setTonBalance(prev => Math.max(0, prev - pack.price));
-                            setMyBalance(prev => Math.max(0, prev + (pack.ducks * 1000)));
-                            setUserData(prev => prev ? { ...prev, hasBoughtWithTon: true } : prev);
-                            
+                            setTonBalance(prev => Math.max(0, prev - miner.priceTon));
                             WebApp.HapticFeedback.notificationOccurred('success');
-                            WebApp.showAlert(`Successfully purchased ${(pack.ducks * 1000).toLocaleString()} DUCK!`);
+                            WebApp.showAlert(`Successfully purchased ${miner.name}!`);
                           } catch (e) { console.error(e); }
                         }}
-                        className={`w-full py-2.5 rounded-2xl flex items-center justify-center gap-2 bg-gradient-to-b from-white to-gray-200 shadow-[0_4px_0_rgba(0,0,0,0.2)] active:translate-y-[2px] active:shadow-none transition-all akira-font`}
+                        className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 ${isOwned ? 'bg-gray-800 text-white/40' : 'bg-gradient-to-b from-white to-gray-200 shadow-[0_6px_0_rgba(0,0,0,0.2)] active:translate-y-[2px] active:shadow-none'} transition-all akira-font`}
                       >
-                        <TonIcon size={18} />
-                        <span className="text-base font-black text-black uppercase leading-none">{pack.price}</span>
+                        {isOwned ? (
+                          <span className="text-sm font-black uppercase">ALREADY OWNED</span>
+                        ) : (
+                          <>
+                            <span className="text-sm font-black text-black uppercase">BUY FOR</span>
+                            <div className="flex items-center gap-1.5 bg-black/10 px-3 py-1 rounded-xl">
+                              <TonIcon size={20} />
+                              <span className="text-lg font-black text-black">{miner.priceTon}</span>
+                            </div>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
       </div>
       {isGameLoaded && (
         <div className="fixed bottom-6 left-0 right-0 w-full max-w-[360px] mx-auto px-4 z-[100]">
-          <div className="bg-[#111]/95 backdrop-blur-3xl border border-white/10 rounded-[40px] h-[72px] flex justify-between items-center px-2 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+          <div className="bg-white/[0.03] backdrop-blur-3xl border border-white/10 rounded-[40px] h-[72px] flex justify-between items-center px-2 shadow-[0_20px_50px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.1)]">
             {[
               { id: 'market', icon: Store },
               { id: 'home', icon: Home },
@@ -3661,13 +3838,18 @@ const App = () => {
                   {isActive && (
                     <motion.div 
                       layoutId="nav-selection"
-                      className="absolute inset-0 bg-gradient-to-br from-[#2563EB] to-[#1E40AF] border-[1.5px] border-white rounded-full z-0 shadow-[0_0_15px_rgba(37,99,235,0.4)]"
-                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      className="absolute inset-0 bg-white/[0.08] backdrop-blur-xl border border-white/40 rounded-full z-0 shadow-[0_8px_32px_rgba(255,255,255,0.1),inset_0_2px_4px_rgba(255,255,255,0.2)]"
+                      transition={{ 
+                        type: "spring", 
+                        stiffness: 300, 
+                        damping: 25,
+                        mass: 1.2
+                      }}
                     />
                   )}
                   <Icon 
                     size={isActive ? 24 : 20} 
-                    className={`relative z-10 transition-all duration-300 ${isActive ? 'text-white' : 'text-[#666]'}`} 
+                    className={`relative z-10 transition-all duration-300 ${isActive ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'text-[#888]'}`} 
                   />
                 </div>
               );
