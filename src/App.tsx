@@ -2563,27 +2563,34 @@ const App = () => {
     
     setIsClaimingWelcome(true);
     const timeoutId = setTimeout(() => {
-      if (isClaimingWelcome) {
-        setIsClaimingWelcome(false);
-        WebApp.showAlert("Claiming timed out. Please try again.");
-      }
-    }, 10000);
+      setIsClaimingWelcome(false);
+      WebApp.showAlert("Claiming timed out. Please check your connection and try again.");
+    }, 15000);
 
     try {
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         balance: increment(welcomeReward),
-        welcomeBonusClaimed: true
+        welcomeBonusClaimed: true,
+        updatedAt: serverTimestamp()
       });
+      
       setMyBalance(prev => prev + welcomeReward);
-      setShowWelcomePopup(false);
       WebApp.HapticFeedback.notificationOccurred('success');
       clearTimeout(timeoutId);
+      
+      // Small delay for visual feedback
+      setTimeout(() => {
+        setShowWelcomePopup(false);
+        setIsClaimingWelcome(false);
+        WebApp.showAlert(`Welcome bonus of ${formatCurrency(welcomeReward)} DUCK claimed successfully!`);
+      }, 500);
+      
     } catch (error) {
       console.error("Error claiming welcome bonus:", error);
-      WebApp.showAlert("Error claiming bonus. Please check your connection.");
-    } finally {
+      clearTimeout(timeoutId);
       setIsClaimingWelcome(false);
+      WebApp.showAlert("Error claiming bonus. Please try again later.");
     }
   };
 
@@ -2599,66 +2606,96 @@ const App = () => {
     }
     
     const cost = getUpgradeCost(currentLevel);
-    if (currency === 'duck' && myBalance < cost.duck) {
-      WebApp.showAlert("Insufficient DUCK balance!");
-      return;
-    }
-    if (currency === 'ton' && tonBalance < cost.ton) {
-      WebApp.showAlert("Insufficient TON balance!");
+    const amount = currency === 'duck' ? cost.duck : cost.ton;
+    const balance = currency === 'duck' ? myBalance : tonBalance;
+
+    if (balance < amount) {
+      WebApp.showAlert(`Insufficient ${currency.toUpperCase()} balance!`);
       return;
     }
 
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        balance: currency === 'duck' ? increment(-cost.duck) : increment(0),
-        tonBalance: currency === 'ton' ? increment(-cost.ton) : increment(0),
-        [`miners.${miner.id}.level`]: increment(1),
-      });
-      if (currency === 'duck') setMyBalance(prev => prev - cost.duck);
-      if (currency === 'ton') setTonBalance(prev => prev - cost.ton);
-      WebApp.HapticFeedback.notificationOccurred('success');
-      WebApp.showAlert(`Upgraded to Level ${currentLevel + 1}!`);
-      setIsUpgradePopupOpen(false);
-    } catch (e) {
-      console.error("Error upgrading:", e);
-      WebApp.showAlert("Failed to upgrade. Please try again.");
-    }
+    showModal({
+      title: `Upgrade to Level ${currentLevel + 1}?`,
+      description: `Upgrade cost: ${currency === 'duck' ? formatCurrency(amount) : amount.toFixed(2)} ${currency.toUpperCase()}`,
+      type: 'confirm',
+      onConfirm: async () => {
+        try {
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, {
+            balance: currency === 'duck' ? increment(-cost.duck) : increment(0),
+            tonBalance: currency === 'ton' ? increment(-cost.ton) : increment(0),
+            [`miners.${miner.id}.level`]: increment(1),
+          });
+          if (currency === 'duck') setMyBalance(prev => prev - cost.duck);
+          if (currency === 'ton') setTonBalance(prev => prev - cost.ton);
+          WebApp.HapticFeedback.notificationOccurred('success');
+          showModal({
+            title: 'Upgrade Successful!',
+            description: `Successfully upgraded to Level ${currentLevel + 1}! Your mining efficiency has increased.`,
+            type: 'alert'
+          });
+          setIsUpgradePopupOpen(false);
+        } catch (e) {
+          console.error("Error upgrading:", e);
+          WebApp.showAlert("Failed to upgrade. Please try again.");
+        }
+      }
+    });
   };
 
   const handlePurchaseMiner = async (miner: any) => {
-    if (!user) return;
-    const isOwned = !!userData?.miners?.[miner.id];
-    if (isOwned) return;
-    if (tonBalance < miner.priceTon) {
-      WebApp.showAlert("Insufficient TON balance! Please deposit TON first.");
+    if (!user || !userData) {
+      WebApp.showAlert("User data not loaded. Please wait a moment.");
       return;
     }
     
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        tonBalance: increment(-miner.priceTon),
-        [`miners.${miner.id}`]: {
-          level: 0,
-          purchasedAt: Date.now(),
-          lastClaimAt: Date.now(),
-          lastBoostAt: 0,
-          claimsCount: 0,
-          totalDuckEarned: 0,
-          totalTonEarned: 0,
-          miningStartedAt: Date.now(),
-          isBoosting: false,
-          boostStartedAt: 0
-        }
-      });
-      setTonBalance(prev => prev - miner.priceTon);
-      WebApp.HapticFeedback.notificationOccurred('success');
-      WebApp.showAlert(`Successfully purchased ${miner.name}!`);
-    } catch (e) {
-      console.error("Error purchasing miner:", e);
-      WebApp.showAlert("Failed to purchase. Please try again.");
+    const isOwned = !!userData?.miners?.[miner.id];
+    if (isOwned) {
+      WebApp.showAlert("You already own this miner!");
+      return;
     }
+    
+    if (tonBalance < miner.priceTon) {
+      WebApp.showAlert(`Insufficient TON balance! You need ${miner.priceTon} TON to purchase ${miner.name}.`);
+      return;
+    }
+
+    showModal({
+      title: `Purchase ${miner.name}?`,
+      description: `Confirm purchase for ${miner.priceTon} TON. This will start your mining journey!`,
+      type: 'confirm',
+      onConfirm: async () => {
+        try {
+          const userRef = doc(db, 'users', user.uid);
+          await updateDoc(userRef, {
+            tonBalance: increment(-miner.priceTon),
+            [`miners.${miner.id}`]: {
+              level: 0,
+              purchasedAt: Date.now(),
+              lastClaimAt: Date.now(),
+              lastBoostAt: 0,
+              claimsCount: 0,
+              totalDuckEarned: 0,
+              totalTonEarned: 0,
+              miningStartedAt: Date.now(),
+              isBoosting: false,
+              boostStartedAt: 0
+            }
+          });
+          setTonBalance(prev => prev - miner.priceTon);
+          WebApp.HapticFeedback.notificationOccurred('success');
+          showModal({
+            title: 'Purchase Successful!',
+            description: `You have successfully purchased ${miner.name}. Go to the Home tab to start mining!`,
+            type: 'alert',
+            onConfirm: () => setActiveTab('home')
+          });
+        } catch (e) {
+          console.error("Error purchasing miner:", e);
+          WebApp.showAlert("Failed to purchase. Please try again.");
+        }
+      }
+    });
   };
 
   const handleResetAllBalances = () => {
@@ -4010,7 +4047,11 @@ const App = () => {
                       <button 
                         disabled={isOwned}
                         onClick={() => handlePurchaseMiner(miner)}
-                        className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 ${isOwned ? 'bg-gray-800 text-white/40' : 'bg-gradient-to-b from-white to-gray-200 shadow-[0_6px_0_rgba(0,0,0,0.2)] active:translate-y-[2px] active:shadow-none'} transition-all akira-font`}
+                        className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all akira-font ${
+                          isOwned 
+                            ? 'bg-gray-800 text-white/40 cursor-not-allowed' 
+                            : 'bg-gradient-to-b from-white to-gray-200 shadow-[0_6px_0_rgba(0,0,0,0.2)] active:translate-y-[2px] active:shadow-none active:scale-[0.98]'
+                        }`}
                       >
                         {isOwned ? (
                           <span className="text-sm font-black uppercase">ALREADY OWNED</span>
