@@ -81,7 +81,8 @@ import {
   Coins,
   MessageSquare,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  Home
 } from 'lucide-react';
 
 /**
@@ -222,7 +223,8 @@ const TRANSLATIONS = {
     leaderboard: 'Leaderboard',
     top100: 'Top 100 Players by DUCK Volume',
     wins: 'Wins',
-    comingSoon: 'Shop coming soon'
+    comingSoon: 'Shop coming soon',
+    home: 'Home'
   },
   ru: {
     arena: 'Арена',
@@ -254,7 +256,8 @@ const TRANSLATIONS = {
     leaderboard: 'Лидерборд',
     top100: 'Топ 100 игроков по объему DUCK',
     wins: 'Побед',
-    comingSoon: 'Магазин скоро'
+    comingSoon: 'Магазин скоро',
+    home: 'Главная'
   },
   fa: {
     arena: 'میدان',
@@ -286,7 +289,8 @@ const TRANSLATIONS = {
     leaderboard: 'جدول امتیازات',
     top100: '۱۰۰ بازیکن برتر بر اساس حجم DUCK',
     wins: 'بردها',
-    comingSoon: 'فروشگاه به زودی'
+    comingSoon: 'فروشگاه به زودی',
+    home: 'خانه'
   },
   de: {
     arena: 'Arena',
@@ -1437,7 +1441,7 @@ const AdminPanel = ({
 };
 
 const App = () => {
-  const [activeTab, setActiveTab] = useState('arena');
+  const [activeTab, setActiveTab] = useState('home');
   const [players, setPlayers] = useState([]);
   const [timeLeft, setTimeLeft] = useState(0);
   const [status, setStatus] = useState('waiting'); 
@@ -1483,6 +1487,23 @@ const App = () => {
   const [hasPlayedBefore, setHasPlayedBefore] = useState(() => {
     return safeStorage.get('giftphase_played') === 'true';
   });
+
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatCountdown = (ms: number) => {
+    if (ms <= 0) return "00:00:00";
+    const seconds = Math.floor((ms / 1000) % 60);
+    const minutes = Math.floor((ms / (1000 * 60)) % 60);
+    const hours = Math.floor((ms / (1000 * 60 * 60)));
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
 
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
@@ -1595,7 +1616,12 @@ const App = () => {
               role: (firebaseUser.email === 'jahidproject8@gmail.com' || (tgUser && [6686954447, 1678112785, 5968063026].includes(tgUser.id))) ? 'admin' : 'user',
               createdAt: serverTimestamp(),
               selectedFrame: 'none',
-              unlockedFrames: []
+              unlockedFrames: [],
+              miningLastClaim: serverTimestamp(),
+              miningRate: 1000,
+              miningCapacity: 12,
+              miningBoost: 1,
+              miningSpeed: 1
             };
             await setDoc(userRef, initialData);
             setMyBalance(10.0);
@@ -1801,7 +1827,7 @@ const App = () => {
 
   useEffect(() => {
     console.log("App Tab Switch:", activeTab);
-    if (activeTab === 'tasks') {
+    if (activeTab === 'tasks' || activeTab === 'home') {
       const interval = setInterval(() => {
         setPromoIndex((prev) => (prev + 1) % PROMO_BANNERS.length);
       }, 4000);
@@ -2501,6 +2527,132 @@ const App = () => {
     return Math.floor(absoluteVal).toLocaleString();
   };
 
+  const renderHome = () => {
+    const miningData = {
+      lastClaim: userData?.miningLastClaim?.toDate ? userData.miningLastClaim.toDate() : (userData?.miningLastClaim ? new Date(userData.miningLastClaim) : new Date(userData?.createdAt?.toDate ? userData.createdAt.toDate() : Date.now())),
+      rate: userData?.miningRate || 1000,
+      capacity: userData?.miningCapacity || 12,
+      boost: userData?.miningBoost || 1,
+      speed: userData?.miningSpeed || 1,
+    };
+
+    const now = currentTime;
+    const last = miningData.lastClaim.getTime();
+    const diffHours = (now - last) / (1000 * 60 * 60);
+    const cappedHours = Math.min(diffHours, miningData.capacity);
+    const accumulated = cappedHours * miningData.rate * miningData.speed * miningData.boost;
+
+    const capacityMs = miningData.capacity * 60 * 60 * 1000;
+    const remainingMs = Math.max(0, (last + capacityMs) - now);
+    const countdown = formatCountdown(remainingMs);
+    const isMiningFinished = remainingMs <= 0;
+
+    const handleClaimMining = async () => {
+      if (!user || accumulated <= 0) return;
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, {
+          balance: increment(accumulated),
+          miningLastClaim: serverTimestamp()
+        });
+        setMyBalance(prev => prev + accumulated);
+        WebApp.HapticFeedback.notificationOccurred('success');
+      } catch (e) {
+        console.error("Error claiming mining:", e);
+      }
+    };
+
+    return (
+      <div className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-40 relative font-sans overscroll-contain z-10 pt-12 px-4">
+        {/* Currency Header */}
+        <div className="flex justify-between items-center px-4 pt-8 pb-3 gap-2 shrink-0">
+          <div className={`px-4 py-2 rounded-full flex items-center justify-center gap-2 min-w-0 font-sans bg-[#1a1a1a] shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)] border border-white/10`}>
+            <TonIcon size={20} />
+            <span className="text-[15px] font-black uppercase akira-font leading-none">{formatCurrency(tonBalance)}<span className="font-black text-lg ml-0.5">+</span></span>
+          </div>
+          <div className={`px-4 py-2 rounded-full flex items-center justify-center gap-2 min-w-0 font-sans bg-[#1a1a1a] shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)] border border-white/10`}>
+            <DuckIcon size={20} />
+            <span className="text-[15px] font-black uppercase akira-font leading-none">{formatCurrency(myBalance)}<span className="font-black text-lg ml-0.5">+</span></span>
+          </div>
+        </div>
+
+        {/* Header Text */}
+        <div className="text-center mb-6 mt-2">
+          <h2 className="text-white font-black text-lg uppercase akira-font tracking-tighter italic">
+            Mine $GIFT With Gift's
+          </h2>
+        </div>
+
+        {/* Mining Machine */}
+        <div className="px-4 mb-6">
+          <div className="relative aspect-square rounded-[44px] overflow-hidden border-[6px] border-[#1a1a1a] bg-gradient-to-br from-[#111] to-[#222] shadow-2xl flex flex-col items-center justify-center p-8">
+            <div className="absolute top-6 text-cyan-400 font-black text-xs uppercase tracking-[0.3em] akira-font">PLUSH PEPE</div>
+            
+            <div className="relative group">
+              <div className="absolute -inset-10 bg-cyan-500/20 blur-3xl rounded-full animate-pulse"></div>
+              <img 
+                src="https://picsum.photos/seed/gift/400/400" 
+                alt="Gift" 
+                className="w-48 h-48 object-contain relative z-10 drop-shadow-[0_0_20px_rgba(0,255,255,0.3)]"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+
+            <div className="absolute bottom-10 flex flex-col items-center">
+              <div className="text-white/40 text-[10px] font-black uppercase tracking-widest mb-1">Mining Status</div>
+              <div className="text-2xl font-black text-white akira-font tracking-tighter">
+                {isMiningFinished ? "FINISHED" : countdown}
+              </div>
+              <div className="text-cyan-400/60 text-[8px] font-black uppercase tracking-[0.2em] mt-1">
+                {miningData.rate.toLocaleString()} DUCK / HOUR
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="px-4 grid grid-cols-2 gap-4 mb-6">
+          <button 
+            onClick={handleClaimMining}
+            disabled={accumulated <= 0}
+            className={`h-16 rounded-[24px] flex flex-col items-center justify-center gap-0.5 border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-none transition-all ${accumulated > 0 ? 'bg-gradient-to-b from-green-500 to-green-700' : 'bg-gray-800 opacity-50 grayscale'}`}
+          >
+            <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">Claim</span>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-black text-white akira-font">{formatCurrency(accumulated)}</span>
+              <DuckIcon size={16} />
+            </div>
+          </button>
+          <button 
+            className="h-16 rounded-[24px] flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-blue-500 to-blue-700 border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[2px] active:shadow-none transition-all"
+          >
+            <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">Upgrade</span>
+            <span className="text-sm font-black text-white akira-font">LEVEL {userData?.miningLevel || 1}</span>
+          </button>
+        </div>
+
+        {/* Stats Buttons */}
+        <div className="px-4 grid grid-cols-3 gap-3">
+          <button className="py-4 rounded-[20px] bg-[#1a1a1a] border border-white/5 flex flex-col items-center gap-1 shadow-lg active:scale-95 transition-all">
+            <ArrowUpCircle size={20} className="text-cyan-400" />
+            <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Capacity</span>
+            <span className="text-[10px] font-black text-white akira-font">{miningData.capacity}H</span>
+          </button>
+          <button className="py-4 rounded-[20px] bg-[#1a1a1a] border border-white/5 flex flex-col items-center gap-1 shadow-lg active:scale-95 transition-all">
+            <Zap size={20} className="text-yellow-400" />
+            <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Boost</span>
+            <span className="text-[10px] font-black text-white akira-font">X{miningData.boost}</span>
+          </button>
+          <button className="py-4 rounded-[20px] bg-[#1a1a1a] border border-white/5 flex flex-col items-center gap-1 shadow-lg active:scale-95 transition-all">
+            <Bolt size={20} className="text-green-400" />
+            <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Speed</span>
+            <span className="text-[10px] font-black text-white akira-font">X{miningData.speed}</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const renderArena = () => {
     const isBidDisabled = (status !== 'waiting') || (timeLeft === 1 && players.length >= 2);
 
@@ -2884,6 +3036,8 @@ const App = () => {
               const adTimer = adTimers[task.id] || 0;
               const isAdReady = adReady[task.id] || false;
 
+              const showCountdown = isDone && task.type === 'daily' && task.resetInterval > 0;
+              
               let themeGrad = 'from-[#0891B2] to-[#2563EB]';
               if (task.type === 'achievement') themeGrad = 'from-[#7C3AED] to-[#4F46E5]';
               if (task.type === 'partner') themeGrad = 'from-[#E11D48] to-[#C026D3]';
@@ -2919,7 +3073,7 @@ const App = () => {
               return (
                 <React.Fragment key={task.id}>
                   <div 
-                    className={`p-4 rounded-[28px] bg-gradient-to-b ${themeGrad} border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] flex flex-col transition-all relative overflow-hidden ${isDone ? 'opacity-[0.15]' : 'opacity-100'} ${isAdsTask ? 'min-h-[140px] justify-center gap-4' : 'items-center justify-between flex-row'}`}
+                    className={`p-4 rounded-[28px] bg-gradient-to-b ${themeGrad} border-t border-white/20 shadow-[0_5px_0_rgba(0,0,0,0.4)] flex flex-col transition-all relative overflow-hidden ${isDone && !showCountdown ? 'opacity-[0.15]' : 'opacity-100'} ${isAdsTask ? 'min-h-[140px] justify-center gap-4' : 'items-center justify-between flex-row'}`}
                     style={customStyle}
                   >
                     {isLocked && (
@@ -2942,6 +3096,25 @@ const App = () => {
                         </span>
                       </div>
                     )}
+                    
+                    {showCountdown && (
+                      <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-[1px] flex flex-col items-center justify-center p-4 text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="text-[8px] font-black text-white/60 uppercase tracking-[0.2em] mb-1">Resets in</span>
+                          <span className="text-[18px] font-black text-white akira-font tracking-tighter drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
+                            {(() => {
+                              const completionTime = taskCompletionTimes[task.id];
+                              if (!completionTime) return "00:00:00";
+                              const lastCompleted = completionTime.toDate ? completionTime.toDate() : new Date(completionTime);
+                              const resetMs = isAdsTask ? task.resetInterval * 1000 : task.resetInterval * 60 * 60 * 1000;
+                              const remainingMs = lastCompleted.getTime() + resetMs - currentTime;
+                              return formatCountdown(remainingMs);
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-4 w-full min-w-0">
                       <div className="w-10 h-10 rounded-2xl bg-black/20 flex items-center justify-center text-white shrink-0">{displayIcon}</div>
                       <div className="flex flex-col flex-1 min-w-0">
@@ -3379,6 +3552,7 @@ const App = () => {
         </div>
       )}
       <div className="flex-1 flex flex-col h-full overflow-hidden touch-pan-y relative z-10">
+        {isGameLoaded && activeTab === 'home' && renderHome()}
         {isGameLoaded && activeTab === 'arena' && renderArena()}
         {isGameLoaded && activeTab === 'tasks' && renderTaskCenter()}
         {isGameLoaded && activeTab === 'profile' && renderProfile()}
@@ -3461,14 +3635,35 @@ const App = () => {
         )}
       </div>
       {isGameLoaded && (
-        <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-black/85 backdrop-blur-3xl border-t border-white/5 z-[100] pb-9 flex justify-around items-center font-sans h-24">
-          <div onClick={() => { setActiveTab('market'); setIsAdminPanelOpen(false); }} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'market' ? 'text-[#3498db] scale-110' : 'text-[#5d666d]'}`}><Store size={26} /><span className="text-[11px] font-bold uppercase font-sans">{t.shop}</span></div>
-          <div onClick={() => { setActiveTab('arena'); setIsAdminPanelOpen(false); }} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'arena' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}><Gamepad2 size={26} /><span className="text-[11px] font-bold uppercase font-sans">{t.arena}</span></div>
-          <div onClick={() => { setActiveTab('tasks'); setIsAdminPanelOpen(false); }} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'tasks' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}><ClipboardList size={26} /><span className="text-[11px] font-bold uppercase font-sans">{t.tasks}</span></div>
-          <div onClick={() => { setActiveTab('rank'); setIsAdminPanelOpen(false); }} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'rank' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}><Trophy size={26} /><span className="text-[11px] font-bold uppercase font-sans">{t.rank}</span></div>
-          <div onClick={() => { setActiveTab('profile'); setIsAdminPanelOpen(false); }} className={`flex flex-col items-center justify-end h-full gap-1.5 cursor-pointer transition-all ${activeTab === 'profile' ? 'text-[#2563EB] scale-110' : 'text-[#5d666d]'}`}>
-            <User size={26} />
-            <span className="text-[11px] font-bold uppercase font-sans">{t.profile}</span>
+        <div className="fixed bottom-6 left-0 right-0 w-full max-w-[360px] mx-auto px-4 z-[100]">
+          <div className="bg-[#111]/95 backdrop-blur-3xl border border-white/10 rounded-[40px] h-[72px] flex justify-between items-center px-2 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+            {[
+              { id: 'market', icon: Store },
+              { id: 'home', icon: Home },
+              { id: 'arena', icon: Gamepad2 },
+              { id: 'tasks', icon: ClipboardList },
+              { id: 'rank', icon: Trophy },
+              { id: 'profile', icon: User },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <div 
+                  key={tab.id}
+                  onClick={() => { setActiveTab(tab.id as any); setIsAdminPanelOpen(false); }} 
+                  className={`relative flex items-center justify-center cursor-pointer transition-all duration-500 ease-in-out
+                    ${isActive 
+                      ? 'flex-[2] h-[50px] bg-transparent border-[1.5px] border-white rounded-full mx-0.5' 
+                      : 'flex-1 h-[44px] max-w-[44px] bg-[#1a1a1a] rounded-full mx-0.5'
+                    }`}
+                >
+                  <Icon 
+                    size={isActive ? 24 : 20} 
+                    className={`transition-all duration-300 ${isActive ? 'text-white' : 'text-[#666]'}`} 
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
