@@ -1955,18 +1955,18 @@ const App = () => {
         setPlayers(gameData.players || []);
         
         // If status changed to drawing and we are not already drawing, start local animation
-        if (gameData.status === 'drawing' && status === 'waiting') {
-          // Use the shared parameters if available
-          const remoteStartPos = gameData.startPos || { x: 50, y: 50 };
-          const remoteSpeed = gameData.speed || 45;
-          const remoteAngle = gameData.angle || 0;
-          
-          // Trigger local animation with remote parameters
-          // We'll need to adjust runDrawSequence to accept these
-          startRemoteAnimation(remoteStartPos, remoteSpeed, remoteAngle);
-        }
+        // We use the functional update of setStatus to check the previous status correctly
+        // independently of the effect's dependency array.
+        setStatus(prevStatus => {
+          if (gameData.status === 'drawing' && prevStatus === 'waiting') {
+            const remoteStartPos = gameData.startPos || { x: 50, y: 50 };
+            const remoteSpeed = gameData.speed || 45;
+            const remoteAngle = gameData.angle || 0;
+            startRemoteAnimation(remoteStartPos, remoteSpeed, remoteAngle);
+          }
+          return gameData.status || 'waiting';
+        });
 
-        setStatus(gameData.status || 'waiting');
         setWinner(gameData.winner || null);
         if (gameData.status === 'winner' && gameData.winner) {
            setPersistentWinner({...gameData.winner, totalPrize: gameData.totalPot});
@@ -1976,7 +1976,7 @@ const App = () => {
       handleFirestoreError(error, OperationType.GET, 'games/current');
     });
     return () => unsubscribe();
-  }, [isAuthReady, status]);
+  }, [isAuthReady, user]);
 
   const startRemoteAnimation = (startPos: any, speed: number, angle: number) => {
     setStatus('drawing');
@@ -2342,7 +2342,9 @@ const App = () => {
       if (area && area.username !== hoverInfo.name) setHoverInfo({ name: area.username, color: area.color });
       if (v < 0.03) { 
         physicsRef.current.active = false; 
-        const resWinner = area || players[0];
+        
+        // Use the pre-calculated winner for consistency if it exists
+        const resWinner = winner || area || players[0];
         setWinner(resWinner); 
         const winAmount = totalPot;
         setPersistentWinner({...resWinner, totalPrize: winAmount});
@@ -2474,6 +2476,24 @@ const App = () => {
     // Optimistic local update
     if (isMe) {
       setMyBalance(prev => Math.max(0, prev - finalAmt));
+      setPlayers(prev => {
+        const exists = prev.find(p => p.uid === uid);
+        if (exists) {
+          return prev.map(p => p.uid === uid ? { ...p, bet: p.bet + finalAmt } : p);
+        }
+        const pal = PLAYER_PALETTE[prev.length % PLAYER_PALETTE.length];
+        return [...prev, {
+          uid,
+          username: n,
+          avatar: a,
+          bet: finalAmt,
+          color: pal.main,
+          lightColor: pal.light,
+          accentColor: pal.accent,
+          isMe: true,
+          id: Date.now()
+        }];
+      });
     }
 
     try {
@@ -2554,9 +2574,16 @@ const App = () => {
       });
     } catch (error) {
       console.error("Bid Error:", error);
-      // Rollback local balance if failed
+      // Rollback local state if failed
       if (isMe) {
         setMyBalance(prev => prev + finalAmt);
+        setPlayers(prev => prev.map(p => {
+          if (p.uid === uid) {
+            const newBet = p.bet - finalAmt;
+            return newBet > 0 ? { ...p, bet: newBet } : null;
+          }
+          return p;
+        }).filter(Boolean) as any[]);
       }
       if (error instanceof Error) {
         if (error.message === "Game already started") {
@@ -3220,8 +3247,9 @@ const App = () => {
       <div className="px-4 flex justify-between items-end mb-3 px-1 font-sans shrink-0"><div><span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.totalPool}</span><div className="text-cyan-400 font-black text-2xl tracking-tighter flex items-center gap-1 akira-font">{formatCurrency(totalPot)} <DuckIcon size={28} /></div></div><div className="text-right"><span className="text-gray-500 text-[10px] font-bold uppercase tracking-widest">{t.startingIn}</span><div className="font-mono text-2xl font-black">00:{timeLeft.toString().padStart(2, '0')}</div></div></div>
       <div className="mx-4 relative group shrink-0"><div className="relative aspect-square rounded-[44px] overflow-hidden border-[6px] border-[#1a1a1a] bg-[#111] shadow-2xl mb-6">{players.length === 0 ? <div className="absolute inset-0 flex items-center justify-center text-gray-600 font-black uppercase text-center px-10 italic">{t.waiting}</div> : (<div className={`absolute inset-0 transition-transform duration-[450ms] ease-out ${isZoomed ? 'scale-[2.8]' : 'scale-100'}`} style={{ transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%` }}><StaticBoard territories={territories} winner={winner} /></div>)}<div className={`absolute z-[60] w-14 h-14 transition-opacity duration-300 pointer-events-none flex flex-col items-center justify-center ${status === 'drawing' || status === 'winner' ? 'opacity-100' : 'opacity-0'}`} style={{ left: `${selectorPos.x}%`, top: `${selectorPos.y}%`, transform: 'translate(-50%, -50%)' }}>{status === 'drawing' && hoverInfo.name && (<div key={hoverInfo.name} className={`absolute bg-black/95 backdrop-blur-xl px-4 py-2 rounded-full border border-white/20 flex items-center gap-2.5 shadow-2xl animate-in slide-in-from-bottom-1 fade-in duration-150 transition-all ${selectorPos.y < 25 ? 'top-14 translate-y-2' : '-top-14 -translate-y-2'}`}><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: hoverInfo.color }}></div><span className="text-[6.5px] font-black uppercase tracking-widest text-white">{hoverInfo.name}</span></div>)}{isAiming && <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ transform: `rotate(${selectorAngle}deg)` }}><ArrowUp size={34} className="text-white -translate-y-9 animate-pulse" /></div>}<div className="w-full h-full bg-white/20 backdrop-blur-[3.5px] rounded-full border-[3.5px] border-white shadow-[0_0_30px_rgba(255,255,255,0.45)] relative flex items-center justify-center overflow-hidden"><div className="absolute w-full h-[1px] bg-white/40"></div><div className="absolute h-full w-[1px] bg-white/40"></div><div className="relative z-10 w-4 h-4 flex items-center justify-center"><div className="absolute w-4 h-[2.5px] bg-white shadow-[0_0_8px_white] text-transparent">.</div><div className="absolute h-4 w-[2.5px] bg-white shadow-[0_0_8px_white] text-transparent">.</div></div></div></div></div></div>
       <div className="px-4 w-full flex items-center gap-2 mb-8 mt-2 shrink-0 overflow-x-auto no-scrollbar py-2">
-        <button 
+        <motion.button 
           disabled={isBidDisabled} 
+          whileTap={!isBidDisabled ? { scale: 0.9 } : {}}
           onClick={() => {
             showModal({
               title: 'Custom Bid',
@@ -3243,24 +3271,26 @@ const App = () => {
           className={`${premium3DStyle} w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${isBidDisabled ? 'opacity-50 grayscale' : ''}`}
         >
           <Pencil size={20} className="text-white" />
-        </button>
+        </motion.button>
         {[10000, 50000, 100000, ...(customBid ? [customBid] : [])].map(v => (
-          <button 
+          <motion.button 
             key={v} 
             disabled={isBidDisabled} 
+            whileTap={!isBidDisabled ? { scale: 0.95, y: 2 } : {}}
             onClick={() => addBid(v, true)} 
             className={`${premium3DStyle} min-w-[90px] flex-1 h-14 rounded-[24px] font-black text-[15px] akira-font flex items-center justify-center gap-1 ${isBidDisabled ? 'opacity-50 grayscale' : ''}`}
           >
             <span className="leading-none">{formatCurrencySimple(v)}</span> <DuckIcon size={20} />
-          </button>
+          </motion.button>
         ))}
-        <button 
+        <motion.button 
           disabled={isBidDisabled} 
+          whileTap={!isBidDisabled ? { scale: 0.95, y: 2 } : {}}
           onClick={() => addBid(myBalance, true)} 
-          className={`min-w-[85px] flex-1 h-14 rounded-[24px] font-black text-[15px] bg-gradient-to-b from-[#2563EB] to-[#1E40AF] border-t border-white/30 shadow-[0_5px_0_rgba(0,0,0,0.4)] active:translate-y-[1px] uppercase transition-all akira-font ${isBidDisabled ? 'opacity-50 grayscale' : ''}`}
+          className={`min-w-[85px] flex-1 h-14 rounded-[24px] font-black text-[15px] bg-gradient-to-b from-[#2563EB] to-[#1E40AF] border-t border-white/30 shadow-[0_5px_0_rgba(0,0,0,0.4)] uppercase transition-all akira-font ${isBidDisabled ? 'opacity-50 grayscale' : ''}`}
         >
           <span className="leading-none">All-in</span>
-        </button>
+        </motion.button>
       </div>
 
       {/* Live Player List */}
@@ -4171,13 +4201,15 @@ const App = () => {
                         </div>
                       </div>
 
-                      <button 
+                      <motion.button 
                         disabled={isOwned}
+                        whileHover={!isOwned ? { scale: 1.02 } : {}}
+                        whileTap={!isOwned ? { scale: 0.96, y: 2 } : {}}
                         onClick={() => handlePurchaseMiner(miner)}
                         className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all akira-font ${
                           isOwned 
                             ? 'bg-gray-800 text-white/40 cursor-not-allowed' 
-                            : 'bg-gradient-to-b from-white to-gray-200 shadow-[0_6px_0_rgba(0,0,0,0.2)] active:translate-y-[2px] active:shadow-none active:scale-[0.98]'
+                            : 'bg-gradient-to-b from-white to-gray-200 shadow-[0_6px_0_rgba(0,0,0,0.2)] border-t border-white/40'
                         }`}
                       >
                         {isOwned ? (
@@ -4191,7 +4223,7 @@ const App = () => {
                             </div>
                           </>
                         )}
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
                 );
@@ -4282,7 +4314,7 @@ const App = () => {
           </div>
         </div>
       )}
-      {activeTab === 'arena' && status === 'winner' && persistentWinner && (
+      {status === 'winner' && persistentWinner && (
         <div className="fixed inset-0 z-[200] flex items-end justify-center animate-in fade-in duration-500">
            <div className="absolute inset-0 backdrop-blur-2xl transition-all duration-1000" style={{ background: `radial-gradient(circle at center, rgba(37, 99, 235, 0.4), rgba(79, 70, 229, 0.3), rgba(0, 0, 0, 0.6))` }} onClick={() => resetGame()}></div>
            <div className="relative w-full max-w-md bg-[#111] rounded-t-[44px] border-t border-white/15 shadow-[0_-20px_80px_rgba(0,0,0,1)] flex flex-col items-center p-6 pt-12 pb-10 overflow-hidden max-h-[85vh] animate-spring-up">
