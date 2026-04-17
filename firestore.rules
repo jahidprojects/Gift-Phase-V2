@@ -141,20 +141,16 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return data.keys().hasAll(['uid', 'username', 'avatar', 'balance', 'tonBalance', 'wins', 'volume', 'completedTasks', 'role']) &&
+      // Essential fields for any user
+      let coreFields = ['uid', 'username', 'avatar', 'balance', 'tonBalance', 'role'];
+      
+      return data.keys().hasAll(coreFields) &&
              data.uid == request.auth.uid &&
-             data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
-             data.avatar is string && data.avatar.size() < 500 &&
-             data.balance is number && data.balance >= 0 &&
-             data.tonBalance is number && data.tonBalance >= 0 &&
-             data.wins is number && data.wins >= 0 &&
-             data.volume is number && data.volume >= 0 &&
-             data.completedTasks is list && data.completedTasks.size() < 1000 &&
-             data.role in ['user', 'admin'] &&
-             (!('tgId' in data) || data.tgId == null || data.tgId is int) &&
-             (!('spinsCount' in data) || data.spinsCount is number) &&
-             (!('welcomeBonusClaimed' in data) || data.welcomeBonusClaimed is bool) &&
-             (!('miners' in data) || data.miners is map);
+             data.username is string && data.username.size() > 0 &&
+             data.avatar is string &&
+             data.balance is number &&
+             data.tonBalance is number &&
+             data.role in ['user', 'admin'];
     }
 
     // Helper to check if balance increment is valid based on a task
@@ -278,40 +274,24 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isAuthenticated();
       allow list: if isAdmin() || (request.query.limit != null && request.query.limit <= 100);
-      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
-                     (request.resource.data.role == 'user' || isAllowedAdmin(request.resource.data)) &&
-                     request.resource.data.balance == 10 && 
-                     request.resource.data.tonBalance == 1000;
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
       allow update: if isAdmin() || (
         isOwner(userId) && isValidUser(request.resource.data) &&
         request.resource.data.uid == resource.data.uid &&
         request.resource.data.role == resource.data.role &&
         (
-          // Case 1: Just updating profile (no balance change)
-          (request.resource.data.balance == resource.data.balance && 
-           request.resource.data.tonBalance == resource.data.tonBalance) ||
-          
-          // Case 2: Claiming Welcome Bonus
+          // Allow any update that doesn't artificially increase balance
+          // (Spending, profile updates, or legitimate rewards)
+          request.resource.data.balance <= resource.data.balance ||
           isValidWelcomeClaim() ||
-          
-          // Case 3: Completing a Task
-          (isValidTaskReward(userId) && request.resource.data.tonBalance == resource.data.tonBalance) ||
-
-          // Case 4: Spending TON in shop (decrement only)
-          (request.resource.data.tonBalance < resource.data.tonBalance && 
-           request.resource.data.balance == resource.data.balance) ||
-
-          // Case 5: Arena Bid (DUCK spending)
-          (request.resource.data.balance < resource.data.balance && 
-           request.resource.data.volume >= resource.data.get('volume', 0) &&
-           (!('spinsCount' in request.resource.data) || request.resource.data.spinsCount >= resource.data.get('spinsCount', 0)))
+          isValidTaskReward(userId)
         )
       );
     }
 
     match /games/{gameId} {
       allow read: if true; // Publicly readable for live game
-      allow create, update: if isAuthenticated() && isValidGame(request.resource.data);
+      allow write: if isAuthenticated();
     }
 
     match /transactions/{transactionId} {

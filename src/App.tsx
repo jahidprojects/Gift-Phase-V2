@@ -1831,6 +1831,7 @@ const App = () => {
               tonBalance: 1000,
               wins: 0,
               volume: 0,
+              spinsCount: 0,
               completedTasks: [],
               referrer: referrerId || null,
               role: (firebaseUser.email === 'jahidproject8@gmail.com' || (tgUser && [6686954447, 1678112785, 5968063026].includes(tgUser.id))) ? 'admin' : 'user',
@@ -1952,25 +1953,38 @@ const App = () => {
     const unsubscribe = onSnapshot(gameRef, (snapshot) => {
       if (snapshot.exists()) {
         const gameData = snapshot.data();
-        setPlayers(gameData.players || []);
         
-        // If status changed to drawing and we are not already drawing, start local animation
-        // We use the functional update of setStatus to check the previous status correctly
-        // independently of the effect's dependency array.
+        // Update players list (which updates totalPot via useMemo)
+        setPlayers(gameData.players || []);
+        setWinner(gameData.winner || null);
+        
+        // Use functional status update to handle transitions cleanly
         setStatus(prevStatus => {
-          if (gameData.status === 'drawing' && prevStatus === 'waiting') {
+          const remoteStatus = gameData.status || 'waiting';
+
+          // Scenario A: Remote trigger starts drawing
+          if (remoteStatus === 'drawing' && prevStatus === 'waiting') {
             const remoteStartPos = gameData.startPos || { x: 50, y: 50 };
             const remoteSpeed = gameData.speed || 45;
             const remoteAngle = gameData.angle || 0;
-            startRemoteAnimation(remoteStartPos, remoteSpeed, remoteAngle);
+            // Delay slightly to ensure players array is synced before animation starts
+            setTimeout(() => startRemoteAnimation(remoteStartPos, remoteSpeed, remoteAngle), 50);
+            return 'drawing';
           }
-          return gameData.status || 'waiting';
-        });
 
-        setWinner(gameData.winner || null);
-        if (gameData.status === 'winner' && gameData.winner) {
-           setPersistentWinner({...gameData.winner, totalPrize: gameData.totalPot});
-        }
+          // Scenario B: Remote says winner but we are still animating locally
+          if (remoteStatus === 'winner' && prevStatus === 'drawing') {
+            // Keep drawing locally until puck stops; shootPuck will set status to 'winner'
+            return 'drawing'; 
+          }
+
+          // Scenario C: Local physics finished and set winner, or we just joined a finished game
+          if (remoteStatus === 'winner' && gameData.winner) {
+            setPersistentWinner({ ...gameData.winner, totalPrize: gameData.totalPot });
+          }
+
+          return remoteStatus;
+        });
       }
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'games/current');
